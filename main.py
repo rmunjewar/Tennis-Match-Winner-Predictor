@@ -2,6 +2,8 @@
 import pandas as pd
 import numpy as np
 import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -71,13 +73,19 @@ X_test = scaler.transform(X_test)
 
 # # models: log reg and decision tree - can add more
 models = {
-    "Logistic Regression": LogisticRegression(),
+    "Logistic Regression": LogisticRegression(solver='saga'),
     "Decision Tree": DecisionTreeClassifier()
 }
 
 for name, model in models.items():
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
+    X_scaled = scaler.fit_transform(X)  
+    # cross validation on 10 folds
+    # tests strongness of model
+    # had to scale X because the number of iterations was being surpassed causing an error
+    scores = cross_val_score(model, X_scaled, y, cv=10, scoring='accuracy')
+
     print("-" * 50)
     print(f"{name} Results:")
     print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
@@ -85,3 +93,19 @@ for name, model in models.items():
     print(f"Recall: {recall_score(y_test, y_pred):.4f}")
     print(f"F1 Score: {f1_score(y_test, y_pred):.4f}")
     print("-" * 50)
+    
+    #added cross validation
+    print(f"{name} Cross-Validation:")
+    print(f"Mean Accuracy: {scores.mean():.4f}")
+    print(f"Standard Deviation: {scores.std():.4f}")
+    print("-" * 50)
+
+    
+    # added visual confusion matrix
+    cm = confusion_matrix(y_test, y_pred)
+    plt.figure(figsize=(6, 4))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="GnBu", xticklabels=["Lose", "Win"], yticklabels=["Lose", "Win"])
+    plt.title(f"Confusion Matrix for {name}")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.show()
