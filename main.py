@@ -136,7 +136,7 @@ X_scaled = scaler.fit_transform(X)
 # PCA - Dimensionality Reduction Visualization
 # --------------------------
 
-# This is for PCA
+# This is for 1D PCA
     # finds directions where data varies the most 
     # purpose: show similarities between groups of samples in data set
 pca = PCA()
