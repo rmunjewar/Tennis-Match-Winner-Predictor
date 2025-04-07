@@ -1,32 +1,56 @@
-# imports
+# --------------------------
+# Imports
+# --------------------------
 import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
+
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, confusion_matrix
+)
+from sklearn.decomposition import PCA
 
-# load dataset
+# --------------------------
+# Load dataset
+# --------------------------
 url = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_2023.csv"
 df = pd.read_csv(url)
 # print(df.head())
 
-# columns - need to add/remove but temporary
-columns = ['winner_id', 'loser_id', 'surface', 'round', 'minutes', 'w_ace', 'w_df', 'w_bpSaved', 'w_bpFaced',
-           'l_ace', 'l_df', 'l_bpSaved', 'l_bpFaced', 'winner_rank', 'loser_rank'] # btw github has definitions for terms
-df = df[columns]
+# --------------------------
+# Relevant Columsn
+# --------------------------
+columns = [
+    # most important
+    'winner_seed', 'loser_seed', 'winner_rank_points', 'loser_rank_points',
 
-# cleaning
-df = df.dropna()
+    # important
+    'winner_rank', 'loser_rank', 'w_1stIn', 'w_ace', 'winner_ioc',
 
-# encoding -> changing categorical data into numerical
-label_encoder = LabelEncoder()
-df['surface'] = label_encoder.fit_transform(df['surface'])
-df['round'] = label_encoder.fit_transform(df['round'])
+    # less important
+    'surface', 'loser_age', 'winner_age', 'l_bpSaved', 'w_bpFaced',
+    'w_2ndWon', 'w_1stWon', 'winner_ht', 'loser_ht'
+]
+
+df = df[columns].dropna()
+
+# --------------------------
+# Encode Variables
+# --------------------------
+le_surface = LabelEncoder()
+le_ioc = LabelEncoder()
+df['surface'] = le_surface.fit_transform(df['surface'])
+df['winner_ioc'] = le_ioc.fit_transform(df['winner_ioc'])
+
+# --------------------------
+# Create Winner and Loser DFs
+# --------------------------
 
 df_winner = df.copy()
 df_winner['target'] = 1
@@ -34,53 +58,125 @@ df_winner['target'] = 1
 df_loser = df.copy()
 df_loser['target'] = 0
 
-# need to check what we want for columns
-df_loser = df_loser.rename(columns={
-    'winner_id': 'player2_id', 'loser_id': 'player1_id',
-    'winner_rank': 'player2_rank', 'loser_rank': 'player1_rank',
-    'w_ace': 'player2_ace', 'l_ace': 'player1_ace',
-    'w_df': 'player2_df', 'l_df': 'player1_df',
-    'w_bpSaved': 'player2_bpSaved', 'l_bpSaved': 'player1_bpSaved',
-    'w_bpFaced': 'player2_bpFaced', 'l_bpFaced': 'player1_bpFaced'
-})
-
+# columsn renamed for player1 vs player2 format
 df_winner = df_winner.rename(columns={
     'winner_id': 'player1_id', 'loser_id': 'player2_id',
+    'winner_seed': 'player1_seed', 'loser_seed': 'player2_seed',
+    'winner_rank_points': 'player1_rank_points', 'loser_rank_points': 'player2_rank_points',
     'winner_rank': 'player1_rank', 'loser_rank': 'player2_rank',
-    'w_ace': 'player1_ace', 'l_ace': 'player2_ace',
-    'w_df': 'player1_df', 'l_df': 'player2_df',
-    'w_bpSaved': 'player1_bpSaved', 'l_bpSaved': 'player2_bpSaved',
-    'w_bpFaced': 'player1_bpFaced', 'l_bpFaced': 'player2_bpFaced'
+    'w_1stIn': 'player1_1stIn', 'w_ace': 'player1_ace',
+    'winner_ioc': 'player1_ioc', 'surface': 'surface',
+    'winner_age': 'player1_age', 'loser_age': 'player2_age',
+    'w_bpFaced': 'player1_bpFaced', 'l_bpSaved': 'player2_bpSaved',
+    'w_2ndWon': 'player1_2ndWon', 'w_1stWon': 'player1_1stWon',
+    'winner_ht': 'player1_ht', 'loser_ht': 'player2_ht'
 })
 
-# originally, when i split the data, we only had one class, so this splits losers and winners
-df_balanced = pd.concat([df_winner, df_loser], axis=0)
+df_loser = df_loser.rename(columns={
+    'winner_id': 'player2_id', 'loser_id': 'player1_id',
+    'winner_seed': 'player2_seed', 'loser_seed': 'player1_seed',
+    'winner_rank_points': 'player2_rank_points', 'loser_rank_points': 'player1_rank_points',
+    'winner_rank': 'player2_rank', 'loser_rank': 'player1_rank',
+    'w_1stIn': 'player2_1stIn', 'w_ace': 'player2_ace',
+    'winner_ioc': 'player2_ioc', 'surface': 'surface',
+    'winner_age': 'player2_age', 'loser_age': 'player1_age',
+    'w_bpFaced': 'player2_bpFaced', 'l_bpSaved': 'player1_bpSaved',
+    'w_2ndWon': 'player2_2ndWon', 'w_1stWon': 'player2_1stWon',
+    'winner_ht': 'player2_ht', 'loser_ht': 'player1_ht'
+})
+
+
+df_winner = df_winner.dropna(thresh=int(0.9 * df_winner.shape[1]))
+df_loser = df_loser.dropna(thresh=int(0.9 * df_loser.shape[1]))
+
+
+# --------------------------
+# Combine Winner and Loser into one dataset
+# --------------------------
+
+df_balanced = pd.concat([df_winner, df_loser], axis=0).reset_index(drop=True)
 
 # print(df_balanced['target'].value_counts())
+df_balanced = df_balanced.drop(columns=[col for col in ['player1_id', 'player2_id'] if col in df_balanced.columns])
+
+for column in df_balanced.columns:
+    if df_balanced[column].isnull().sum() > 0:
+        if df_balanced[column].dtype == 'object':
+            df_balanced[column] = df_balanced[column].fillna(df_balanced[column].mode()[0])
+        else:
+            df_balanced[column] = df_balanced[column].fillna(df_balanced[column].median())
+
+df_balanced = df_balanced.drop(columns=[col for col in ['player1_id', 'player2_id'] if col in df_balanced.columns])
+
+print(f"Target distribution:\n{df_balanced['target'].value_counts()}")
 
 
+# --------------------------
+# Prepare Features and Labels
+# --------------------------
 X = df_balanced.drop(columns=['target'])
 y = df_balanced['target']
 
-# training testing split - may need to adjust parameters?
-# needed to straify y for class balance
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+# --------------------------
+# Train/Test Split
+# --------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
 
-# # standarization 
+# --------------------------
+# Standardize Features
+# --------------------------
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
+X_scaled = scaler.fit_transform(X)
 
-# # models: log reg and decision tree - can add more
+# --------------------------
+# PCA - Dimensionality Reduction Visualization
+# --------------------------
+
+# This is for PCA
+    # finds directions where data varies the most 
+    # purpose: show similarities between groups of samples in data set
+pca = PCA()
+X_pca = pca.fit_transform(X_scaled)
+
+plt.figure(figsize=(10, 6))
+plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
+plt.xlabel("Number of Components")
+plt.ylabel("Total Explained Variance")
+plt.title("PCA")
+plt.grid(True)
+plt.show()
+
+# This is for PCA 2D model
+    # each point represents 1 match
+    # PCA 1 = most important direction of variance
+    # PCA 2 = second-most important
+    # 1 - match win, 0 - match loss
+pca_2 = PCA(n_components=2)
+X_pca_2d = pca_2.fit_transform(X_scaled)
+plt.figure(figsize=(8, 5))
+sns.scatterplot(x=X_pca_2d[:, 0], y=X_pca_2d[:, 1], hue=y, alpha=0.6)
+plt.title("PCA -2D Projection")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.show()
+
+
+
+# --------------------------
+# Models
+# --------------------------
 models = {
-    "Logistic Regression": LogisticRegression(solver='saga'),
     "Decision Tree": DecisionTreeClassifier()
 }
+
 
 for name, model in models.items():
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    X_scaled = scaler.fit_transform(X)  
     # cross validation on 10 folds
     # tests strongness of model
     # had to scale X because the number of iterations was being surpassed causing an error
