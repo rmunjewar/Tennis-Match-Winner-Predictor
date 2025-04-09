@@ -15,6 +15,8 @@ from sklearn.metrics import (
     f1_score, confusion_matrix
 )
 from sklearn.decomposition import PCA
+from sklearn.neighbors import KNeighborsClassifier
+
 
 # --------------------------
 # Load dataset
@@ -58,7 +60,7 @@ df_winner['target'] = 1
 df_loser = df.copy()
 df_loser['target'] = 0
 
-# columsn renamed for player1 vs player2 format
+# columns renamed for player1 vs player2 format
 df_winner = df_winner.rename(columns={
     'winner_id': 'player1_id', 'loser_id': 'player2_id',
     'winner_seed': 'player1_seed', 'loser_seed': 'player2_seed',
@@ -164,13 +166,41 @@ plt.xlabel("Principal Component 1")
 plt.ylabel("Principal Component 2")
 plt.show()
 
+#showing KNN visually
+knn_2d = KNeighborsClassifier(n_neighbors=6)
+knn_2d.fit(X_pca_2d, y)
 
+#creates a mesh grid of evenly spaced points acrossed the 2d space using steps of 0.1
+x_min, x_max = X_pca_2d[:, 0].min() - 1, X_pca_2d[:, 0].max() + 1
+y_min, y_max = X_pca_2d[:, 1].min() - 1, X_pca_2d[:, 1].max() + 1
+
+#xx and yy are 2d arrays from the meshgrid
+xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.1),
+                     np.arange(y_min, y_max, 0.1))
+
+#predict for each point in the mesh grid
+#raveling flattens xx and yy into 1d arrays of all the x or y coordinates in the grid
+#z tells you the value predicted at each (x,y) spot (either 1 or 0)
+Z = knn_2d.predict(np.c_[xx.ravel(), yy.ravel()])
+Z = Z.reshape(xx.shape)
+
+
+plt.figure(figsize=(10, 6))
+plt.contourf(xx, yy, Z, alpha=0.3, cmap='coolwarm')
+sns.scatterplot(x=X_pca_2d[:, 0], y=X_pca_2d[:, 1], hue=y, palette='coolwarm', alpha=0.7)
+plt.title('k-NN Decision Boundary (PCA 2D)')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.legend(title='Match Outcome', labels=["lose (0)", "win (1)"])
+plt.grid(True)
+plt.show()
 
 # --------------------------
 # Models
 # --------------------------
 models = {
-    "Decision Tree": DecisionTreeClassifier()
+    "Decision Tree": DecisionTreeClassifier(),
+    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=6)
 }
 
 
