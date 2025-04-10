@@ -205,13 +205,8 @@ plt.show()
 # --------------------------
 models = {
     "Decision Tree": DecisionTreeClassifier(),
-<<<<<<< HEAD
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
     "k-NN (k=7)": KNeighborsClassifier(n_neighbors=7)
-=======
-    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=6),
-    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
->>>>>>> 1f2c9e76749f92354a79121b2b84dfff5aa9ad84
 }
 
 
