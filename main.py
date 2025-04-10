@@ -16,6 +16,7 @@ from sklearn.metrics import (
 )
 from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 
 # --------------------------
@@ -26,7 +27,7 @@ df = pd.read_csv(url)
 # print(df.head())
 
 # --------------------------
-# Relevant Columsn
+# Relevant Columns
 # --------------------------
 columns = [
     # most important
@@ -200,7 +201,8 @@ plt.show()
 # --------------------------
 models = {
     "Decision Tree": DecisionTreeClassifier(),
-    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=6)
+    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=6),
+    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
 }
 
 
