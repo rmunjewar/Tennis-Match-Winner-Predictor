@@ -156,13 +156,13 @@ X_scaled = scaler.fit_transform(X)
 pca = PCA()
 X_pca = pca.fit_transform(X_scaled)
 
-plt.figure(figsize=(10, 6))
-plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
-plt.xlabel("Number of Components")
-plt.ylabel("Total Explained Variance")
-plt.title("PCA")
-plt.grid(True)
-plt.show()
+# plt.figure(figsize=(10, 6))
+# plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
+# plt.xlabel("Number of Components")
+# plt.ylabel("Total Explained Variance")
+# plt.title("PCA")
+# plt.grid(True)
+# plt.show()
 
 # This is for PCA 2D model
     # each point represents 1 match
@@ -171,15 +171,15 @@ plt.show()
     # 1 - match win, 0 - match loss
 pca_2 = PCA(n_components=2)
 X_pca_2d = pca_2.fit_transform(X_scaled)
-plt.figure(figsize=(8, 5))
-sns.scatterplot(x=X_pca_2d[:, 0], y=X_pca_2d[:, 1], hue=y, alpha=0.6)
-plt.title("PCA -2D Projection")
-plt.xlabel("Principal Component 1")
-plt.ylabel("Principal Component 2")
-plt.show()
+# plt.figure(figsize=(8, 5))
+# sns.scatterplot(x=X_pca_2d[:, 0], y=X_pca_2d[:, 1], hue=y, alpha=0.6)
+# plt.title("PCA -2D Projection")
+# plt.xlabel("Principal Component 1")
+# plt.ylabel("Principal Component 2")
+# plt.show()
 
 #showing KNN visually
-knn_2d = KNeighborsClassifier(n_neighbors=6)
+knn_2d = KNeighborsClassifier(n_neighbors=7)
 knn_2d.fit(X_pca_2d, y)
 
 #creates a mesh grid of evenly spaced points acrossed the 2d space using steps of 0.1
@@ -212,7 +212,7 @@ plt.show()
 # --------------------------
 models = {
     "Decision Tree": DecisionTreeClassifier(),
-    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=6)
+    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=7)
 }
 
 
