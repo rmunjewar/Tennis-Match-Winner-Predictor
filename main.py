@@ -33,18 +33,12 @@ columns = [
     # most important
     'winner_seed', 'loser_seed', 
     
-    #'winner_rank_points', 'loser_rank_points',
-
     # important
     'winner_rank', 'loser_rank', 
-    #'w_1stIn', 'w_ace', 
     'winner_ioc',
     
     # less important
-    'surface', 'loser_age', 'winner_age', 'tourney_level',
-    
-    #'l_bpSaved', 'w_bpFaced','w_2ndWon', 'w_1stWon', 
-    
+    'surface', 'loser_age', 'winner_age', 'tourney_level',    
     'winner_ht', 'loser_ht'
 ]
 
@@ -103,7 +97,6 @@ df_loser = df_loser.dropna(thresh=int(0.9 * df_loser.shape[1]))
 
 df_balanced = pd.concat([df_winner, df_loser], axis=0).reset_index(drop=True)
 
-# print(df_balanced['target'].value_counts())
 df_balanced = df_balanced.drop(columns=[col for col in ['player1_id', 'player2_id'] if col in df_balanced.columns])
 
 for column in df_balanced.columns:
@@ -149,13 +142,13 @@ X_scaled = scaler.fit_transform(X)
 pca = PCA()
 X_pca = pca.fit_transform(X_scaled)
 
-# plt.figure(figsize=(10, 6))
-# plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
-# plt.xlabel("Number of Components")
-# plt.ylabel("Total Explained Variance")
-# plt.title("PCA")
-# plt.grid(True)
-# plt.show()
+plt.figure(figsize=(10, 6))
+plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
+plt.xlabel("Number of Components")
+plt.ylabel("Total Explained Variance")
+plt.title("PCA")
+plt.grid(True)
+plt.show()
 
 # This is for PCA 2D model
     # each point represents 1 match
@@ -164,12 +157,12 @@ X_pca = pca.fit_transform(X_scaled)
     # 1 - match win, 0 - match loss
 pca_2 = PCA(n_components=2)
 X_pca_2d = pca_2.fit_transform(X_scaled)
-# plt.figure(figsize=(8, 5))
-# sns.scatterplot(x=X_pca_2d[:, 0], y=X_pca_2d[:, 1], hue=y, alpha=0.6)
-# plt.title("PCA -2D Projection")
-# plt.xlabel("Principal Component 1")
-# plt.ylabel("Principal Component 2")
-# plt.show()
+plt.figure(figsize=(8, 5))
+sns.scatterplot(x=X_pca_2d[:, 0], y=X_pca_2d[:, 1], hue=y, alpha=0.6)
+plt.title("PCA -2D Projection")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.show()
 
 #showing KNN visually
 knn_2d = KNeighborsClassifier(n_neighbors=7)
