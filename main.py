@@ -31,14 +31,21 @@ df = pd.read_csv(url)
 # --------------------------
 columns = [
     # most important
-    'winner_seed', 'loser_seed', 'winner_rank_points', 'loser_rank_points',
+    'winner_seed', 'loser_seed', 
+    
+    #'winner_rank_points', 'loser_rank_points',
 
     # important
-    'winner_rank', 'loser_rank', 'w_1stIn', 'w_ace', 'winner_ioc',
-
+    'winner_rank', 'loser_rank', 
+    #'w_1stIn', 'w_ace', 
+    'winner_ioc',
+    
     # less important
-    'surface', 'loser_age', 'winner_age', 'l_bpSaved', 'w_bpFaced',
-    'w_2ndWon', 'w_1stWon', 'winner_ht', 'loser_ht'
+    'surface', 'loser_age', 'winner_age', 'tourney_level',
+    
+    #'l_bpSaved', 'w_bpFaced','w_2ndWon', 'w_1stWon', 
+    
+    'winner_ht', 'loser_ht'
 ]
 
 df = df[columns].dropna()
@@ -48,8 +55,11 @@ df = df[columns].dropna()
 # --------------------------
 le_surface = LabelEncoder()
 le_ioc = LabelEncoder()
+le_level = LabelEncoder()
 df['surface'] = le_surface.fit_transform(df['surface'])
 df['winner_ioc'] = le_ioc.fit_transform(df['winner_ioc'])
+df['tourney_level'] = le_level.fit_transform(df['tourney_level'])
+
 
 # --------------------------
 # Create Winner and Loser DFs
@@ -63,28 +73,30 @@ df_loser['target'] = 0
 
 # columns renamed for player1 vs player2 format
 df_winner = df_winner.rename(columns={
-    'winner_id': 'player1_id', 'loser_id': 'player2_id',
+    #'winner_id': 'player1_id', 'loser_id': 'player2_id',
     'winner_seed': 'player1_seed', 'loser_seed': 'player2_seed',
-    'winner_rank_points': 'player1_rank_points', 'loser_rank_points': 'player2_rank_points',
+    #'winner_rank_points': 'player1_rank_points', 'loser_rank_points': 'player2_rank_points',
     'winner_rank': 'player1_rank', 'loser_rank': 'player2_rank',
-    'w_1stIn': 'player1_1stIn', 'w_ace': 'player1_ace',
+    #'w_1stIn': 'player1_1stIn', 'w_ace': 'player1_ace',
     'winner_ioc': 'player1_ioc', 'surface': 'surface',
     'winner_age': 'player1_age', 'loser_age': 'player2_age',
-    'w_bpFaced': 'player1_bpFaced', 'l_bpSaved': 'player2_bpSaved',
-    'w_2ndWon': 'player1_2ndWon', 'w_1stWon': 'player1_1stWon',
+    'tourney_level': 'tourney_level',
+    #'w_bpFaced': 'player1_bpFaced', 'l_bpSaved': 'player2_bpSaved',
+    #'#w_2ndWon': 'player1_2ndWon', 'w_1stWon': 'player1_1stWon',
     'winner_ht': 'player1_ht', 'loser_ht': 'player2_ht'
 })
 
 df_loser = df_loser.rename(columns={
-    'winner_id': 'player2_id', 'loser_id': 'player1_id',
+    #'winner_id': 'player2_id', 'loser_id': 'player1_id',
     'winner_seed': 'player2_seed', 'loser_seed': 'player1_seed',
-    'winner_rank_points': 'player2_rank_points', 'loser_rank_points': 'player1_rank_points',
+    #'winner_rank_points': 'player2_rank_points', 'loser_rank_points': 'player1_rank_points',
     'winner_rank': 'player2_rank', 'loser_rank': 'player1_rank',
-    'w_1stIn': 'player2_1stIn', 'w_ace': 'player2_ace',
+    #'w_1stIn': 'player2_1stIn', 'w_ace': 'player2_ace',
     'winner_ioc': 'player2_ioc', 'surface': 'surface',
     'winner_age': 'player2_age', 'loser_age': 'player1_age',
-    'w_bpFaced': 'player2_bpFaced', 'l_bpSaved': 'player1_bpSaved',
-    'w_2ndWon': 'player2_2ndWon', 'w_1stWon': 'player2_1stWon',
+    'tourney_level': 'tourney_level',
+    #'w_bpFaced': 'player2_bpFaced', 'l_bpSaved': 'player1_bpSaved',
+    #'w_2ndWon': 'player2_2ndWon', 'w_1stWon': 'player2_1stWon',
     'winner_ht': 'player2_ht', 'loser_ht': 'player1_ht'
 })
 
@@ -145,13 +157,13 @@ X_scaled = scaler.fit_transform(X)
 pca = PCA()
 X_pca = pca.fit_transform(X_scaled)
 
-plt.figure(figsize=(10, 6))
-plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
-plt.xlabel("Number of Components")
-plt.ylabel("Total Explained Variance")
-plt.title("PCA")
-plt.grid(True)
-plt.show()
+# plt.figure(figsize=(10, 6))
+# plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o')
+# plt.xlabel("Number of Components")
+# plt.ylabel("Total Explained Variance")
+# plt.title("PCA")
+# plt.grid(True)
+# plt.show()
 
 # This is for PCA 2D model
     # each point represents 1 match
@@ -160,15 +172,15 @@ plt.show()
     # 1 - match win, 0 - match loss
 pca_2 = PCA(n_components=2)
 X_pca_2d = pca_2.fit_transform(X_scaled)
-plt.figure(figsize=(8, 5))
-sns.scatterplot(x=X_pca_2d[:, 0], y=X_pca_2d[:, 1], hue=y, alpha=0.6)
-plt.title("PCA -2D Projection")
-plt.xlabel("Principal Component 1")
-plt.ylabel("Principal Component 2")
-plt.show()
+# plt.figure(figsize=(8, 5))
+# sns.scatterplot(x=X_pca_2d[:, 0], y=X_pca_2d[:, 1], hue=y, alpha=0.6)
+# plt.title("PCA -2D Projection")
+# plt.xlabel("Principal Component 1")
+# plt.ylabel("Principal Component 2")
+# plt.show()
 
 #showing KNN visually
-knn_2d = KNeighborsClassifier(n_neighbors=6)
+knn_2d = KNeighborsClassifier(n_neighbors=7)
 knn_2d.fit(X_pca_2d, y)
 
 #creates a mesh grid of evenly spaced points acrossed the 2d space using steps of 0.1
@@ -201,8 +213,12 @@ plt.show()
 # --------------------------
 models = {
     "Decision Tree": DecisionTreeClassifier(),
+<<<<<<< HEAD
     "k-NN (k=6)": KNeighborsClassifier(n_neighbors=6),
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
+=======
+    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=7)
+>>>>>>> KNN-Model
 }
 
 
@@ -222,7 +238,7 @@ for name, model in models.items():
     print(f"F1 Score: {f1_score(y_test, y_pred):.4f}")
     print("-" * 50)
     
-    #added cross validation
+    # added cross validation
     print(f"{name} Cross-Validation:")
     print(f"Mean Accuracy: {scores.mean():.4f}")
     print(f"Standard Deviation: {scores.std():.4f}")
