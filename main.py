@@ -205,8 +205,13 @@ plt.show()
 # --------------------------
 models = {
     "Decision Tree": DecisionTreeClassifier(),
+<<<<<<< HEAD
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
     "k-NN (k=7)": KNeighborsClassifier(n_neighbors=7)
+=======
+    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=6),
+    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
+>>>>>>> 1f2c9e76749f92354a79121b2b84dfff5aa9ad84
 }
 
 
@@ -226,7 +231,7 @@ for name, model in models.items():
     print(f"F1 Score: {f1_score(y_test, y_pred):.4f}")
     print("-" * 50)
     
-    # added cross validation
+    #added cross validation
     print(f"{name} Cross-Validation:")
     print(f"Mean Accuracy: {scores.mean():.4f}")
     print(f"Standard Deviation: {scores.std():.4f}")
