@@ -75,28 +75,20 @@ df_loser['target'] = 0
 df_winner = df_winner.rename(columns={
     #'winner_id': 'player1_id', 'loser_id': 'player2_id',
     'winner_seed': 'player1_seed', 'loser_seed': 'player2_seed',
-    #'winner_rank_points': 'player1_rank_points', 'loser_rank_points': 'player2_rank_points',
     'winner_rank': 'player1_rank', 'loser_rank': 'player2_rank',
-    #'w_1stIn': 'player1_1stIn', 'w_ace': 'player1_ace',
     'winner_ioc': 'player1_ioc', 'surface': 'surface',
     'winner_age': 'player1_age', 'loser_age': 'player2_age',
     'tourney_level': 'tourney_level',
-    #'w_bpFaced': 'player1_bpFaced', 'l_bpSaved': 'player2_bpSaved',
-    #'#w_2ndWon': 'player1_2ndWon', 'w_1stWon': 'player1_1stWon',
     'winner_ht': 'player1_ht', 'loser_ht': 'player2_ht'
 })
 
 df_loser = df_loser.rename(columns={
     #'winner_id': 'player2_id', 'loser_id': 'player1_id',
     'winner_seed': 'player2_seed', 'loser_seed': 'player1_seed',
-    #'winner_rank_points': 'player2_rank_points', 'loser_rank_points': 'player1_rank_points',
     'winner_rank': 'player2_rank', 'loser_rank': 'player1_rank',
-    #'w_1stIn': 'player2_1stIn', 'w_ace': 'player2_ace',
     'winner_ioc': 'player2_ioc', 'surface': 'surface',
     'winner_age': 'player2_age', 'loser_age': 'player1_age',
     'tourney_level': 'tourney_level',
-    #'w_bpFaced': 'player2_bpFaced', 'l_bpSaved': 'player1_bpSaved',
-    #'w_2ndWon': 'player2_2ndWon', 'w_1stWon': 'player2_1stWon',
     'winner_ht': 'player2_ht', 'loser_ht': 'player1_ht'
 })
 
@@ -213,9 +205,8 @@ plt.show()
 # --------------------------
 models = {
     "Decision Tree": DecisionTreeClassifier(),
-    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=6),
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
-    "k-NN (k=6)": KNeighborsClassifier(n_neighbors=7)
+    "k-NN (k=7)": KNeighborsClassifier(n_neighbors=7)
 }
 
 
