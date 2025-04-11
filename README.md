@@ -4,6 +4,7 @@
 
 **Developers:**
 ![GitHub contributors](https://img.shields.io/github/contributors/rmunjewar/Tennis-Match-Winner-Predictor)
-🎾 [@rmunjewar](https://github.com/rmunjewar)
-🎾 [@maitreyipurandare](https://github.com/maitreyipurandare) 
-🎾 [@cmyannette](https://github.com/cmyannette)
+
+- 🎾 [@rmunjewar](https://github.com/rmunjewar)
+- 🎾 [@maitreyipurandare](https://github.com/maitreyipurandare) 
+- 🎾 [@cmyannette](https://github.com/cmyannette)
