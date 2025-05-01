@@ -3,7 +3,6 @@
 # --------------------------
 import pandas as pd
 import numpy as np
-import joblib
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
@@ -237,32 +236,3 @@ for name, model in models.items():
     plt.ylabel("Actual")
     plt.show()
 
-# --------------------------
-# Save models and scaler with absolute paths
-# --------------------------
-# Get the current directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Save to both the current directory and the backend directory
-model_path = os.path.join(current_dir, "model.pkl")
-scaler_path = os.path.join(current_dir, "scaler.pkl")
-
-# Save models and scaler
-print(f"Saving model to: {model_path}")
-joblib.dump(models["Random Forest"], model_path)
-print(f"Saving scaler to: {scaler_path}")
-joblib.dump(scaler, scaler_path)
-
-# Also save to parent directory if in a subdirectory
-parent_dir = os.path.dirname(current_dir)
-if "Tennis-Match-Winner-Predictor" in parent_dir:
-    backend_dir = os.path.join(parent_dir, "backend")
-    if os.path.exists(backend_dir):
-        backend_model_path = os.path.join(backend_dir, "model.pkl")
-        backend_scaler_path = os.path.join(backend_dir, "scaler.pkl")
-        print(f"Also saving model to: {backend_model_path}")
-        joblib.dump(models["Random Forest"], backend_model_path)
-        print(f"Also saving scaler to: {backend_scaler_path}")
-        joblib.dump(scaler, backend_scaler_path)
-
-print("Model and scaler saved successfully!")

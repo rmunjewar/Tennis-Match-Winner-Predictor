@@ -1,17 +1,15 @@
-import os
 import pandas as pd
 import numpy as np
-import joblib
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
-
-print("Starting model training and saving process...")
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.neighbors import KNeighborsClassifier
+import pickle  # For saving the model
 
 # --------------------------
 # Load dataset
 # --------------------------
-print("Loading dataset...")
 url = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_2023.csv"
 df = pd.read_csv(url)
 
@@ -19,13 +17,10 @@ df = pd.read_csv(url)
 # Relevant Columns
 # --------------------------
 columns = [
-    # most important
-    'winner_seed', 'loser_seed', 
-    # important
-    'winner_rank', 'loser_rank', 
+    'winner_seed', 'loser_seed',
+    'winner_rank', 'loser_rank',
     'winner_ioc',
-    # less important
-    'surface', 'loser_age', 'winner_age', 'tourney_level',    
+    'surface', 'loser_age', 'winner_age', 'tourney_level',
     'winner_ht', 'loser_ht'
 ]
 
@@ -34,7 +29,6 @@ df = df[columns].dropna()
 # --------------------------
 # Encode Variables
 # --------------------------
-print("Encoding variables...")
 le_surface = LabelEncoder()
 le_ioc = LabelEncoder()
 le_level = LabelEncoder()
@@ -45,7 +39,7 @@ df['tourney_level'] = le_level.fit_transform(df['tourney_level'])
 # --------------------------
 # Create Winner and Loser DFs
 # --------------------------
-print("Creating balanced dataset...")
+
 df_winner = df.copy()
 df_winner['target'] = 1
 
@@ -77,8 +71,10 @@ df_loser = df_loser.dropna(thresh=int(0.9 * df_loser.shape[1]))
 # --------------------------
 # Combine Winner and Loser into one dataset
 # --------------------------
+
 df_balanced = pd.concat([df_winner, df_loser], axis=0).reset_index(drop=True)
-df_balanced = df_balanced.drop(columns=[col for col in ['player1_id', 'player2_id'] if col in df_balanced.columns])
+
+df_balanced = df_balanced.drop(columns=[col for col in ['player1_id', 'player2_id'] if col in df_balanced.columns if col in df_balanced.columns])
 
 for column in df_balanced.columns:
     if df_balanced[column].isnull().sum() > 0:
@@ -87,12 +83,11 @@ for column in df_balanced.columns:
         else:
             df_balanced[column] = df_balanced[column].fillna(df_balanced[column].median())
 
-print(f"Target distribution:\n{df_balanced['target'].value_counts()}")
+df_balanced = df_balanced.drop(columns=[col for col in ['player1_id', 'player2_id'] if col in df_balanced.columns])
 
 # --------------------------
 # Prepare Features and Labels
 # --------------------------
-print("Preparing features and labels...")
 X = df_balanced.drop(columns=['target'])
 y = df_balanced['target']
 
@@ -106,47 +101,22 @@ X_train, X_test, y_train, y_test = train_test_split(
 # --------------------------
 # Standardize Features
 # --------------------------
-print("Standardizing features...")
 scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
+X_train = scaler.fit_transform(X_train)
 
 # --------------------------
-# Train Model
+# Model Training
 # --------------------------
-print("Training Random Forest model...")
 model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train_scaled, y_train)
+model.fit(X_train, y_train)
 
 # --------------------------
-# Save Model and Scaler
+# Save the Model, Scaler, and Encoders
 # --------------------------
-# Get the current working directory
-current_dir = os.getcwd()
-print(f"Current working directory: {current_dir}")
+pickle.dump(model, open('public/model.pkl', 'wb'))
+pickle.dump(scaler, open('public/scaler.pkl', 'wb'))
+pickle.dump(le_surface, open('public/le_surface.pkl', 'wb'))
+pickle.dump(le_ioc, open('public/le_ioc.pkl', 'wb'))
+pickle.dump(le_level, open('public/le_level.pkl', 'wb'))
 
-# Define paths for model and scaler
-model_path = os.path.join(current_dir, 'model.pkl')
-scaler_path = os.path.join(current_dir, 'scaler.pkl')
-
-# Save the model and scaler
-print(f"Saving model to: {model_path}")
-joblib.dump(model, model_path)
-
-print(f"Saving scaler to: {scaler_path}")
-joblib.dump(scaler, scaler_path)
-
-# Verify files were saved
-if os.path.exists(model_path):
-    print(f"✅ Model file saved successfully: {model_path}")
-    print(f"File size: {os.path.getsize(model_path) / 1024:.2f} KB")
-else:
-    print(f"❌ Failed to save model file: {model_path}")
-
-if os.path.exists(scaler_path):
-    print(f"✅ Scaler file saved successfully: {scaler_path}")
-    print(f"File size: {os.path.getsize(scaler_path) / 1024:.2f} KB")
-else:
-    print(f"❌ Failed to save scaler file: {scaler_path}")
-
-print("Done!")
+print("Model trained and saved!")
