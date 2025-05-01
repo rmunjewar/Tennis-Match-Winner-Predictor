@@ -4,7 +4,7 @@
 const API_BASE_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:5000/api' : '/api';
 
 /**
- * Send prediction request to the backend API
+ * send prediction request to the backend API
  * @param {Object} data - Player and match data for prediction
  * @returns {Promise<Object>} - Prediction result with winner and confidence
  */
@@ -35,7 +35,7 @@ export async function getPrediction(data) {
 }
 
 /**
- * Get information about the model features and importance
+ * get information about the model features and importance
  * @returns {Promise<Object>} - Model information
  */
 export async function getModelInfo() {
@@ -54,13 +54,13 @@ export async function getModelInfo() {
 }
 
 /**
- * For development and testing without a backend
+ * for development and testing without a backend
  * @param {Object} data - Player and match data
  * @returns {Promise<Object>} - Mock prediction result with simulated analysis
  */
 export async function getMockPrediction(data) {
   return new Promise((resolve) => {
-    // Simulate API delay
+    // simulate API delay
     setTimeout(() => {
       // more sophisticated logic that takes into account different factors
       const p1Rank = data.player1_rank || 100;
