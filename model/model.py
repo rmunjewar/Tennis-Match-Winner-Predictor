@@ -56,10 +56,11 @@ def load_datasets(data_dir):
 def preprocess_data(df):
     print("Preprocessing data...")
 
-    columns = [
+    # Define the initial set of features we want
+    columns_to_select = [
         'winner_seed', 'loser_seed',
         'winner_rank', 'loser_rank',
-        'winner_rank_points', 'loser_rank_points',  
+        'winner_rank_points', 'loser_rank_points',
         'winner_ioc', 'loser_ioc',
         'surface', 'tourney_level',
         'winner_age', 'loser_age',
@@ -69,51 +70,116 @@ def preprocess_data(df):
         'best_of'  # added match format (3 or 5 sets)
     ]
 
-   
-    existing_columns = [col for col in columns if col in df.columns]
-    print(f"Using {len(existing_columns)} features out of {len(columns)} intended")
+    # --- Player Stats Calculation and Merging ---
+    # Check if IDs exist in the original DataFrame to calculate stats
+    new_stat_cols_added = [] # Keep track of columns added by merge
+    if 'winner_id' in df.columns and 'loser_id' in df.columns:
+        print("Calculating and merging player stats...")
+        try:
+            player_stats = calculate_player_stats(df) # Columns: matches_played, wins, win_percentage
 
+            # Create explicit column names for merging to avoid conflicts
+            player_stats_w = player_stats.add_suffix('_w') # e.g., win_percentage_w
+            player_stats_l = player_stats.add_suffix('_l') # e.g., win_percentage_l
+
+            # Merge winner stats into the main df
+            df = pd.merge(df, player_stats_w, left_on='winner_id', right_index=True, how='left')
+            # Merge loser stats into the main df
+            df = pd.merge(df, player_stats_l, left_on='loser_id', right_index=True, how='left')
+
+            # Get the list of the stat columns actually added
+            new_stat_cols_added = list(player_stats_w.columns) + list(player_stats_l.columns)
+
+            # Add these new columns to the list of columns we eventually want to select
+            columns_to_select.extend(new_stat_cols_added)
+            print(f"Added player stats columns: {new_stat_cols_added}")
+
+        except Exception as stat_e:
+             print(f"Error during player stats calculation/merge: {stat_e}")
+             # Continue without stats if calculation fails
+    else:
+        print("Skipping player stats calculation: 'winner_id' or 'loser_id' not found.")
+
+    # --- Feature Selection ---
+    # Select only the columns that actually exist in the (potentially augmented) df
+    existing_columns = [col for col in columns_to_select if col in df.columns]
+    print(f"Selecting {len(existing_columns)} features...")
+    # Create the final df_selected with the chosen features
     df_selected = df[existing_columns].copy()
 
-    if 'winner_seed' in existing_columns:
+    # --- Imputation (now performed on df_selected) ---
+    print("Starting imputation on selected features...")
+    # Fill NaNs for seeds
+    if 'winner_seed' in df_selected.columns:
         df_selected['winner_seed'] = df_selected['winner_seed'].fillna(999)
-    if 'loser_seed' in existing_columns:
+    if 'loser_seed' in df_selected.columns:
         df_selected['loser_seed'] = df_selected['loser_seed'].fillna(999)
 
-    # fill other numeric features with median
+    # Fill NaNs for the added stat columns (if any player had 0 matches, stats would be NaN/inf)
+    for col in new_stat_cols_added:
+        if col in df_selected.columns:
+            # Replace potential Infinities resulting from division by zero in stats
+            df_selected[col] = df_selected[col].replace([np.inf, -np.inf], 0)
+            # Fill remaining NaNs (e.g., for players not found in merge) with 0
+            df_selected[col] = df_selected[col].fillna(0)
+
+    # Fill other numeric features with median
     numeric_cols = df_selected.select_dtypes(include=[np.number]).columns
     for col in numeric_cols:
-        df_selected[col] = df_selected[col].fillna(df_selected[col].median())
+        # Avoid re-filling columns already handled (seeds, stats)
+        if col not in ['winner_seed', 'loser_seed'] and col not in new_stat_cols_added:
+            # Check if column still has NaNs before filling
+            if df_selected[col].isnull().any():
+                median_val = df_selected[col].median()
+                df_selected[col] = df_selected[col].fillna(median_val)
 
-    # fill categorical features with mode
+    # Fill categorical features with mode
     categorical_cols = df_selected.select_dtypes(include=['object']).columns
     for col in categorical_cols:
-        df_selected[col] = df_selected[col].fillna(df_selected[col].mode()[0])
+         if df_selected[col].isnull().any():
+             mode_val = df_selected[col].mode()
+             # Handle cases where mode() might return multiple values or empty
+             if not mode_val.empty:
+                df_selected[col] = df_selected[col].fillna(mode_val[0])
+             else:
+                 # Fallback if mode is empty (e.g., all values are NaN)
+                 df_selected[col] = df_selected[col].fillna("Unknown") # Or another placeholder
 
-    # create win percentage features if we have multiple years of data
-    if 'winner_id' in df.columns and 'loser_id' in df.columns:
-        player_stats = calculate_player_stats(df)
-        df_selected = pd.merge(df_selected, player_stats, left_on='winner_id', right_index=True, how='left')
-        df_selected = pd.merge(df_selected, player_stats, left_on='loser_id', right_index=True, how='left', suffixes=('_winner', '_loser'))
+
+    print("Imputation complete.")
+    # Final check for NaNs
+    if df_selected.isnull().sum().sum() > 0:
+        print("Warning: NaNs still present after imputation:")
+        print(df_selected.isnull().sum()[df_selected.isnull().sum() > 0])
+
 
     return df_selected
 
-# calc player statistics based on historical data
+# You also need the calculate_player_stats function (make sure it's correctly defined)
 def calculate_player_stats(df):
-    player_ids = pd.concat([df['winner_id'], df['loser_id']]).unique()
+    # Combine winner and loser IDs to find all unique players
+    player_ids = pd.concat([df['winner_id'], df['loser_id']]).dropna().unique()
     stats = pd.DataFrame(index=player_ids)
 
-    # calc win percentage
+    # Calculate wins and losses for each player
     wins = df['winner_id'].value_counts()
     losses = df['loser_id'].value_counts()
 
-    stats['matches_played'] = wins.add(losses, fill_value=0)
-    stats['wins'] = wins
-    stats['win_percentage'] = stats['wins'] / stats['matches_played']
+    # Combine to get total matches played
+    stats['matches_played'] = wins.add(losses, fill_value=0).astype(int) # Ensure integer type
+    stats['wins'] = wins.fillna(0).astype(int) # Fill NaN for players with 0 wins
 
-    # fill NaN values (players with no wins)
+    # Calculate win percentage, handle division by zero
+    # Use .loc to avoid SettingWithCopyWarning if stats was a slice
+    stats['win_percentage'] = 0.0 # Initialize with float
+    # Calculate only where matches_played > 0
+    stats.loc[stats['matches_played'] > 0, 'win_percentage'] = \
+        stats['wins'] / stats['matches_played']
+
+    # Fill any remaining NaNs in stats DataFrame (e.g., if a player ID was NaN initially)
     stats = stats.fillna(0)
 
+    print(f"Calculated stats for {len(stats)} players.")
     return stats
 
 # --------------------------
@@ -184,6 +250,7 @@ def create_balanced_dataset(df_selected):
     id_cols = [col for col in df_balanced.columns if 'id' in col]
     df_balanced = df_balanced.drop(columns=id_cols, errors='ignore')
 
+
     return df_balanced
 
 # --------------------------
@@ -198,6 +265,7 @@ def encode_and_prepare(df_balanced):
     # create label encoders for each categorical column
     encoders = {}
     for col in categorical_cols:
+        df_balanced[col] = df_balanced[col].astype(str)
         le = LabelEncoder()
         df_balanced[col] = le.fit_transform(df_balanced[col])
         encoders[col] = le
