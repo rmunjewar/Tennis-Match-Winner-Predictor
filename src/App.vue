@@ -49,8 +49,7 @@
     methods: {
       async handlePrediction(inputData) {
         try {
-          // For demo purposes, we'll create a mock prediction
-          // In a real application, you would uncomment the API call below
+          // api stuff to deal with later
           
           /*
           const response = await fetch('/api/predict', {
@@ -68,7 +67,6 @@
           const result = await response.json();
           */
           
-          // Mock result for demonstration
           const mockResult = {
             winner: Math.random() > 0.5 ? 1 : 0,
             confidence: (Math.random() * 0.5 + 0.5).toFixed(2)

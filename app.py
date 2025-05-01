@@ -1,88 +1,85 @@
 # app.py
 from flask import Flask, request, jsonify
 import pickle
-import numpy as np
 import pandas as pd
-from flask_cors import CORS
+from flask_cors import CORS  # Import Flask-CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Enable CORS for all routes
 
-# Load the model, scaler, and label encoders
+# Load the model and encoders
 try:
     model = pickle.load(open('public/model.pkl', 'rb'))
-    scaler = pickle.load(open('public/scaler.pkl', 'rb'))
-    le_surface = pickle.load(open('public/le_surface.pkl', 'rb'))
-    le_ioc = pickle.load(open('public/le_ioc.pkl', 'rb'))
-    le_level = pickle.load(open('public/le_level.pkl', 'rb'))
+    # Load label encoders
+    encoders = {}
+    import glob, os
+    for file in glob.glob("public/le_*.pkl"):
+        name = os.path.splitext(os.path.basename(file))[0][3:]
+        encoders[name] = pickle.load(open(file, 'rb'))
 
-    print("Model loaded successfully!")
+    # Load feature importance
+    feature_importance = pd.read_csv('public/feature_importance.csv')
+    print("Model and encoders loaded successfully")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    print(f"Error loading model or encoders: {e}")
     model = None
-    scaler = None
-    le_surface = None
-    le_ioc = None
-    le_level = None
+    encoders = {}
+    feature_importance = None
 
-@app.route('/predict', methods=['POST'])
+@app.route('/api/predict', methods=['POST'])
 def predict():
+    if model is None:
+        return jsonify({'error': 'Model not loaded'}), 500
+
     try:
         data = request.get_json()
+        print("Received data:", data) # Debugging
 
-        # Extract data from the request
-        player1_seed = data['player1_seed']
-        player1_rank = data['player1_rank']
-        player1_ioc = data['player1_ioc']
-        player1_age = data['player1_age']
-        player1_ht = data['player1_ht']
+        # Convert data to DataFrame (important for consistent feature order)
+        df = pd.DataFrame([data])  # Put the data in a list
 
-        player2_seed = data['player2_seed']
-        player2_rank = data['player2_rank']
-        player2_ioc = data['player2_ioc']
-        player2_age = data['player2_age']
-        player2_ht = data['player2_ht']
+        # Handle categorical encoding
+        for col, encoder in encoders.items():
+            if col in df.columns:
+                try:
+                    df[col] = encoder.transform(df[col])
+                except Exception as e:
+                    print(f"Error encoding column {col}: {e}")
+                    return jsonify({'error': f'Error encoding column {col}: {str(e)}'}), 400 # Or a more informative error
 
-        surface = data['surface']
-        tourney_level = data['tourney_level']
+        # Ensure the DataFrame has the same columns as the training data
+        expected_cols = feature_importance['feature'].tolist() if feature_importance is not None else [] # List of expected columns
+        missing_cols = [col for col in expected_cols if col not in df.columns]
+        for col in missing_cols:
+            df[col] = 0  # Or use the mean/median from your training data
 
-        # Preprocess the input data
-        input_data = {
-            'player1_seed': player1_seed,
-            'player1_rank': player1_rank,
-            'player1_ioc': player1_ioc,
-            'player1_age': player1_age,
-            'player1_ht': player1_ht,
-            'player2_seed': player2_seed,
-            'player2_rank': player2_rank,
-            'player2_ioc': player2_ioc,
-            'player2_age': player2_age,
-            'player2_ht': player2_ht,
-            'surface': surface,
-            'tourney_level': tourney_level
+        df = df[expected_cols] # Select only the expected columns in the correct order
+
+        # Make prediction
+        prediction = model.predict(df)[0]  # Get the actual prediction (0 or 1)
+        probability = model.predict_proba(df)[0][1] # Probability of Player 1 winning
+
+        # Prepare response
+        result = {
+            'winner': 1 if prediction == 1 else 2,  # Convert to Player 1 or Player 2
+            'confidence': float(probability),  # Convert to regular float
         }
 
-        # Convert categorical variables to numerical
-        input_data['surface'] = le_surface.transform([input_data['surface']])[0]
-        input_data['player1_ioc'] = le_ioc.transform([input_data['player1_ioc']])[0]
-        input_data['player2_ioc'] = le_ioc.transform([input_data['player2_ioc']])[0]
-        input_data['tourney_level'] = le_level.transform([input_data['tourney_level']])[0]
-
-        # Convert input data to a DataFrame
-        input_df = pd.DataFrame([input_data])
-
-        # Scale the input data using the pre-trained scaler
-        scaled_input = scaler.transform(input_df)
-
-        # Make the prediction
-        prediction = model.predict(scaled_input)[0]
-        confidence = np.max(model.predict_proba(scaled_input))
-
-        # Return the prediction and confidence
-        return jsonify({'winner': int(prediction), 'confidence': float(confidence)})
+        print("Prediction:", result)
+        return jsonify(result)
 
     except Exception as e:
-        return jsonify({'error': str(e)})
+        print(f"Prediction error: {e}")
+        return jsonify({'error': str(e)}), 500  # Return error message
+
+@app.route('/api/model-info')
+def model_info():
+    if feature_importance is None:
+        return jsonify({'error': 'Feature importance data not loaded'}), 500
+
+    # Return the top N features and their importances
+    top_features = feature_importance.head(10).to_dict(orient='records')
+    return jsonify({'top_features': top_features})
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    app.run(debug=True) # Development only!  Use a production server for deployment.

@@ -115,7 +115,7 @@
         </div>
       </div>
   
-      <!-- Submit Button -->
+      <!-- submit Button -->
       <div class="submit-container">
         <button type="submit" :disabled="loading">
           {{ loading ? 'Predicting...' : 'Predict Winner' }}
@@ -152,7 +152,7 @@
         tourneyLevel: 'G',
         loading: false,
         
-        // Constant data
+        // constant players users choose from
         players: [
           { name: 'Novak Djokovic', rank: 1, seed: 1, ioc: 'SRB', age: 36, ht: 188 },
           { name: 'Carlos Alcaraz', rank: 2, seed: 2, ioc: 'ESP', age: 20, ht: 183 },
@@ -185,7 +185,6 @@
       };
     },
     created() {
-      // Initialize player objects
       this.player1 = this.findPlayerByName(this.selectedPlayer1);
       this.player2 = this.findPlayerByName(this.selectedPlayer2);
     },
@@ -204,7 +203,6 @@
       onSubmit() {
         this.loading = true;
         
-        // Prepare data for API call
         const p1 = this.showCustom1 ? {
           player1_seed: this.customPlayer1.seed || 0,
           player1_rank: this.customPlayer1.rank || 100,
@@ -240,7 +238,6 @@
           tourney_level: this.tourneyLevel
         };
   
-        // Emit the data to parent component to handle API call
         this.$emit('prediction', inputData);
         
         setTimeout(() => {
