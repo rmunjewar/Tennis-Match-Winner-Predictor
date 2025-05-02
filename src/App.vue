@@ -32,23 +32,23 @@
                 <span
                   class="winner"
                   :class="{
-                    player1: prediction.winner === 1,
-                    player2: prediction.winner === 2,
+                    player1: prediction.prediction === 1,
+                    player2: prediction.prediction === 0,
                   }"
                 >
-                  Player {{ prediction.winner }}
+                  Player {{ prediction.prediction === 1 ? "1" : "2" }}
                 </span>
               </div>
               <div class="confidence-meter">
                 <p>
                   P(Player 1 Wins):
-                  {{ Math.round(prediction.confidence_player1_wins * 100) }}%
+                  {{ Math.round(prediction.probability.player1_wins * 100) }}%
                 </p>
                 <div class="progress-container">
                   <div
                     class="progress-bar player1-prob"
                     :style="{
-                      width: `${prediction.confidence_player1_wins * 100}%`,
+                      width: `${prediction.probability.player1_wins * 100}%`,
                     }"
                   ></div>
                 </div>
@@ -80,7 +80,7 @@ export default {
   },
   data() {
     return {
-      allPredictions: null, 
+      allPredictions: null,
       error: null,
       isLoading: false,
     };
@@ -89,7 +89,7 @@ export default {
     async handlePrediction(inputData) {
       this.isLoading = true;
       this.error = null;
-      this.allPredictions = null; 
+      this.allPredictions = null;
 
       console.log("Sending data to backend:", inputData);
 
@@ -124,7 +124,6 @@ export default {
           );
         }
 
-
         this.allPredictions = result.predictions;
       } catch (err) {
         console.error("Prediction failed:", err);
@@ -157,7 +156,7 @@ export default {
       } else if (prediction.winner === 2) {
         return Math.round((1 - prediction.confidence_player1_wins) * 100);
       }
-      return 0; 
+      return 0;
     },
   },
 };

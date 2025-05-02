@@ -1,6 +1,7 @@
 # app.py
 from flask import Flask, request, jsonify
 import pickle
+import traceback
 import pandas as pd
 import numpy as np
 from flask_cors import CORS
@@ -73,167 +74,141 @@ except Exception as e:
 
 @app.route('/api/predict', methods=['POST'])
 def predict():
-    if not models:
-        return jsonify({'error': 'Models not loaded or failed to initialize'}), 500
-
-    if not expected_cols:
-        return jsonify({'error': 'Feature order could not be determined. Cannot make predictions.'}), 500
-
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No input data received'}), 400
+        print(f"Received data: {data}")
 
-        print("Received data:", data)
-
-        default_data = {}
-        for col in expected_cols:
-            if 'rank' in col:
-                default_data[col] = 1000
-            elif 'seed' in col:
-                default_data[col] = 999
-            elif 'age' in col:
-                default_data[col] = 25
-            elif 'ht' in col:
-                default_data[col] = 180
-            elif 'win_percentage' in col:
-                default_data[col] = 0.0
-            elif 'diff' in col:
-                default_data[col] = 0
-            elif 'ace' in col or 'df' in col:
-                default_data[col] = 0
-            elif 'best_of' in col:
-                default_data[col] = 3
-            elif 'matches_played' in col or 'wins' in col:
-                default_data[col] = 0
-            else:
-                default_data[col] = 0 
-        df = pd.DataFrame([default_data])
-
-        player1_rank = data.get('player1_rank', 1000)
-        player2_rank = data.get('player2_rank', 1000)
-        player1_age = data.get('player1_age', 25)
-        player2_age = data.get('player2_age', 25)
-        player1_ht = data.get('player1_ht', 180)
-        player2_ht = data.get('player2_ht', 180)
+        # Create DataFrame with a single row for prediction
+        df = pd.DataFrame([data])
         
-
-        if 'player1_rank' in expected_cols:
-            df['player1_rank'] = player1_rank
-        if 'player2_rank' in expected_cols:
-            df['player2_rank'] = player2_rank
-        if 'player1_seed' in expected_cols:
-            df['player1_seed'] = data.get('player1_seed', 999)
-        if 'player2_seed' in expected_cols:
-            df['player2_seed'] = data.get('player2_seed', 999)
-        if 'player1_age' in expected_cols:
-            df['player1_age'] = player1_age
-        if 'player2_age' in expected_cols:
-            df['player2_age'] = player2_age
-        if 'player1_ht' in expected_cols:
-            df['player1_ht'] = player1_ht
-        if 'player2_ht' in expected_cols:
-            df['player2_ht'] = player2_ht
-        if 'player1_rank_points' in expected_cols:
-            df['player1_rank_points'] = data.get('player1_rank_points', 0)
-        if 'player2_rank_points' in expected_cols:
-            df['player2_rank_points'] = data.get('player2_rank_points', 0)
-        if 'player1_ace' in expected_cols:
-            df['player1_ace'] = data.get('player1_ace', 0)
-        if 'player2_ace' in expected_cols:
-            df['player2_ace'] = data.get('player2_ace', 0)
-        if 'player1_df' in expected_cols:
-            df['player1_df'] = data.get('player1_df', 0)
-        if 'player2_df' in expected_cols:
-            df['player2_df'] = data.get('player2_df', 0)
-        
-    
-        if 'rank_diff' in expected_cols:
-            df['rank_diff'] = player2_rank - player1_rank  
-        if 'age_diff' in expected_cols:
-            df['age_diff'] = player1_age - player2_age
-        if 'height_diff' in expected_cols:
-            df['height_diff'] = player1_ht - player2_ht
-        if 'best_of' in expected_cols:
-            df['best_of'] = data.get('best_of', 3)
-        
-        
-        if 'wins_w' in expected_cols:
-            df['wins_w'] = data.get('wins_w', 0)
-        if 'wins_l' in expected_cols:
-            df['wins_l'] = data.get('wins_l', 0)
-        if 'matches_played_w' in expected_cols:
-            df['matches_played_w'] = data.get('matches_played_w', 0)
-        if 'matches_played_l' in expected_cols:
-            df['matches_played_l'] = data.get('matches_played_l', 0)
-        if 'win_percentage_w' in expected_cols:
-            df['win_percentage_w'] = data.get('win_percentage_w', 0.0)
-        if 'win_percentage_l' in expected_cols:
-            df['win_percentage_l'] = data.get('win_percentage_l', 0.0)
+        # Calculate derived features that were used during training
+        # Age difference
+        if 'player1_age' in df.columns and 'player2_age' in df.columns:
+            df['age_diff'] = df['player1_age'] - df['player2_age']
             
-        # categorical data
-        for col, encoder in encoders.items():
-            if col == 'tourney_level' and 'tourney_level' in expected_cols:
-                current_val = data.get('tourney_level', 'A')
-                if current_val in encoder.classes_:
-                    df['tourney_level'] = encoder.transform([current_val])[0]
-                else:
-                    print(f"Warning: Unseen value '{current_val}' for column 'tourney_level'. Assigning default.")
-                    df['tourney_level'] = 0  
-                    
-            elif col == 'surface' and 'surface' in expected_cols:
-                current_val = data.get('surface', 'Hard')
-                if current_val in encoder.classes_:
-                    df['surface'] = encoder.transform([current_val])[0]
-                else:
-                    print(f"Warning: Unseen value '{current_val}' for column 'surface'. Assigning default.")
-                    df['surface'] = 0  
-                    
-            elif col == 'player1_ioc' and 'player1_ioc' in expected_cols:
-                current_val = data.get('player1_ioc', 'USA')
-                if current_val in encoder.classes_:
-                    df['player1_ioc'] = encoder.transform([current_val])[0]
-                else:
-                    print(f"Warning: Unseen value '{current_val}' for player1_ioc. Assigning default.")
-                    df['player1_ioc'] = 0 
-                    
-            elif col == 'player2_ioc' and 'player2_ioc' in expected_cols:
-                current_val = data.get('player2_ioc', 'USA')
-                if current_val in encoder.classes_:
-                    df['player2_ioc'] = encoder.transform([current_val])[0]
-                else:
-                    print(f"Warning: Unseen value '{current_val}' for player2_ioc. Assigning default.")
-                    df['player2_ioc'] = 0  
-                    
-        df = df[expected_cols]
+        # Height difference
+        if 'player1_ht' in df.columns and 'player2_ht' in df.columns:
+            df['height_diff'] = df['player1_ht'] - df['player2_ht']
+            
+        # Rank difference
+        if 'player1_rank' in df.columns and 'player2_rank' in df.columns:
+            df['rank_diff'] = df['player2_rank'] - df['player1_rank']
         
-        # ---  Predictions for Each Model ---
-        predictions = {}
-        for name, model in models.items():
+        # Add missing columns with default values
+        # These are features that the model was trained with but aren't in the request
+        required_columns = [
+            'rank_diff', 'wins_w', 'wins_l', 'matches_played_w', 'matches_played_l', 
+            'win_percentage_w', 'win_percentage_l', 'player2_rank_points', 'player1_rank', 
+            'player1_rank_points', 'player2_rank', 'player2_ace', 'player1_ace', 'age_diff', 
+            'player2_age', 'player1_age', 'player2_df', 'player1_df', 'player1_ioc', 
+            'player2_ioc', 'height_diff', 'player1_ht', 'player2_ht', 'player2_seed', 
+            'player1_seed', 'tourney_level', 'surface', 'best_of'
+        ]
+        
+        # Add any missing columns with default values
+        for col in required_columns:
+            if col not in df.columns:
+                if col in ['wins_w', 'wins_l', 'matches_played_w', 'matches_played_l']:
+                    df[col] = 0
+                elif col in ['win_percentage_w', 'win_percentage_l']:
+                    df[col] = 0.5
+                elif col in ['player1_rank_points', 'player2_rank_points']:
+                    df[col] = 0
+                elif col in ['player1_ace', 'player2_ace', 'player1_df', 'player2_df']:
+                    df[col] = 0
+                elif col == 'best_of':
+                    # Default to 3 sets for most tournaments, 5 for grand slams
+                    df[col] = 5 if df.get('tourney_level', 'G').iloc[0] == 'G' else 3
+        
+        # Make sure column names match exactly what the model expects
+        # Replace any variations in column names
+        if 'tourney_level' in df.columns:
+            df.rename(columns={'tourney_level': 'tourney_level'}, inplace=True)
+            
+        # Encode categorical variables
+        categorical_cols = ['player1_ioc', 'player2_ioc', 'surface', 'tourney_level']
+        for col in categorical_cols:
+            if col in df.columns:
+                # Load the corresponding label encoder
+                encoder_path = f'public/le_{col}.pkl'
+                if os.path.exists(encoder_path):
+                    encoder = pickle.load(open(encoder_path, 'rb'))
+                    df[col] = df[col].astype(str)  # Ensure string type for encoding
+                    try:
+                        df[col] = encoder.transform(df[col])
+                    except ValueError as e:
+                        # Handle values not seen during training
+                        print(f"Warning: Value not in encoder for {col}: {df[col].values[0]}")
+                        # Use a default value (typically the most common category)
+                        df[col] = 0
+        
+        # Make predictions with each model
+        models = {
+            'decision_tree': 'public/model_decision_tree.pkl',
+            'random_forest': 'public/model_random_forest.pkl',
+            'knn': 'public/model_knn.pkl'
+        }
+        
+        results = {}
+        
+        for model_name, model_path in models.items():
             try:
-                prediction_val = model.predict(df)[0]
-                probability_val = model.predict_proba(df)[0]
-                confidence_p1_wins = float(probability_val[1])
-
-                predictions[name] = {
-                    'winner': 1 if prediction_val == 1 else 2,
-                    'confidence_player1_wins': round(confidence_p1_wins, 4)
+                if not os.path.exists(model_path):
+                    raise FileNotFoundError(f"Model file not found: {model_path}")
+                    
+                model = pickle.load(open(model_path, 'rb'))
+                
+                # IMPORTANT: Make sure df has the same columns in the same order as during training
+                # Get feature names from the model if available
+                if hasattr(model, 'feature_names_in_'):
+                    feature_names = model.feature_names_in_
+                else:
+                    # For pipelines, the feature names are in the first step
+                    feature_names = model.steps[0][1].feature_names_in_
+                
+                # Reorder columns to match training data
+                prediction_df = pd.DataFrame(index=df.index)
+                for feature in feature_names:
+                    if feature in df.columns:
+                        prediction_df[feature] = df[feature]
+                    else:
+                        # If feature is missing, add with default values
+                        prediction_df[feature] = 0
+                
+                # Now make prediction with properly ordered features
+                prediction_val = model.predict(prediction_df)[0]
+                probability = model.predict_proba(prediction_df)[0]
+                
+                results[model_name] = {
+                    'prediction': int(prediction_val),
+                    'probability': {
+                        'player1_wins': float(probability[1]),
+                        'player2_wins': float(probability[0])
+                    }
                 }
-                print(f"Prediction ({name}): {predictions[name]}")
-
-            except Exception as model_e:
-                print(f"Error predicting with model {name}: {model_e}")
-                import traceback
+                
+            except Exception as e:
+                print(f"Error predicting with model {model_name}: {str(e)}")
                 traceback.print_exc()
-                predictions[name] = {'error': f'Prediction failed for {name}: {str(model_e)}'}
-
-        return jsonify({'predictions': predictions})
-
+                results[model_name] = {'error': str(e)}
+        
+        # Combine results from all models
+        response = {
+            'predictions': results,
+            'player1_name': data.get('player1_name', 'Player 1'),
+            'player2_name': data.get('player2_name', 'Player 2'),
+            'match_details': {
+                'surface': data.get('surface', 'Unknown'),
+                'tournament': data.get('tourney_level', 'Unknown')
+            }
+        }
+        
+        return jsonify(response)
+        
     except Exception as e:
-        print(f"General prediction error: {e}")
-        import traceback
+        print(f"Error in prediction endpoint: {str(e)}")
         traceback.print_exc()
-        return jsonify({'error': f'An unexpected error occurred: {str(e)}'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/model-info')
 def model_info():
