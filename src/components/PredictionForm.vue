@@ -439,7 +439,7 @@ export default {
 }
 
 .player1-section {
-  background-color: #e6f2ff;
+  background-color: rgb(143, 197, 255);
 }
 
 .player2-section {

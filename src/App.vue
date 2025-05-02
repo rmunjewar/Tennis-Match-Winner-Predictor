@@ -70,9 +70,6 @@
 
 <script>
 import PredictionForm from "./components/PredictionForm.vue";
-// api stuff for Later
-// Import your API service if you refactored it, otherwise use fetch directly
-// import { getPrediction } from './apiService'; // Example if you have apiService.js
 
 export default {
   components: {
@@ -164,7 +161,7 @@ export default {
 
 <style>
 :root {
-  --primary-color: #3498db;
+  --primary-color: rgb(125, 203, 255);
   --secondary-color: #2ecc71;
   --player1-color: #3498db; /* blue for Player 1 for rn*/
   --player2-color: #e74c3c; /* red for Player 2 for rn*/
