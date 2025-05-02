@@ -1,202 +1,175 @@
-import pandas as pd
-import numpy as np
+# This is a program that learns to predict tennis match winners!
+# It looks at lots of tennis matches and learns patterns about who wins and why.
+
+import pandas as pd  # Helps us work with data in tables
+import numpy as np   # Helps us do math with numbers
 from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.linear_model import LogisticRegression  # init model i started with - delete later
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier  # Our main prediction model
+from sklearn.ensemble import RandomForestClassifier  # Another prediction model
+from sklearn.neighbors import KNeighborsClassifier  # Yet another prediction model
+from sklearn.linear_model import LogisticRegression  # One more prediction model
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from sklearn.pipeline import Pipeline
-import pickle
+import pickle  # Helps us save our trained models
 import os
 import glob
 
-# dir containing the data files
+# Where we keep our tennis match data
 data_dir = "data"
 
-# --------------------------
-# Load and combine datasets from 2021-2024
-# --------------------------
+# Step 1: Load tennis match data
 def load_datasets(data_dir):
-    print("Loading datasets...")
+    print("Loading tennis match data...")
+    
+    # Look for tennis match files on our computer
     all_files = glob.glob(os.path.join(data_dir, "atp_matches_*.csv"))
 
     if not all_files:
-        print("No local data files found. Fetching from GitHub...")
+        print("No files found on computer. Getting data from internet...")
+        # If no files on computer, get them from internet
         years = range(2021, 2024)
         dfs = []
 
         for year in years:
             url = f"https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_{year}.csv"  
-            print(f"Fetching {year} data from {url}")
+            print(f"Getting {year} matches from {url}")
             try:
                 df = pd.read_csv(url)
                 dfs.append(df)
-                print(f"Successfully loaded {year} data: {len(df)} matches")
+                print(f"Got {len(df)} matches from {year}")
             except Exception as e:
-                print(f"Error loading {year} data: {e}")
+                print(f"Oops! Couldn't get {year} data: {e}")
 
         if not dfs:
-            print("Falling back to 2023 data only")
+            print("Using just 2023 matches")
             url = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_2023.csv"
             dfs = [pd.read_csv(url)]
     else:
-        print(f"Found {len(all_files)} local data files")
+        print(f"Found {len(all_files)} files on computer")
         dfs = [pd.read_csv(file) for file in all_files]
 
     if not dfs:
-        raise Exception("No data could be loaded!")
+        raise Exception("No tennis match data found!")
 
+    # Put all the matches together in one big table
     return pd.concat(dfs, ignore_index=True)
 
-# --------------------------
-# Feature Engineering and Preprocessing
-# --------------------------
+# Step 2: Clean up and prepare the data
 def preprocess_data(df):
-    print("Preprocessing data...")
+    print("Cleaning up the data...")
 
-    # Define the initial set of features we want
+    # These are the things we want to know about each match
     columns_to_select = [
-        'winner_seed', 'loser_seed',
-        'winner_rank', 'loser_rank',
-        'winner_rank_points', 'loser_rank_points',
-        'winner_ioc', 'loser_ioc',
-        'surface', 'tourney_level',
-        'winner_age', 'loser_age',
-        'winner_ht', 'loser_ht',
-        'w_ace', 'l_ace',  # added aces
-        'w_df', 'l_df',  # added double faults
-        'best_of'  # added match format (3 or 5 sets)
+        'winner_seed', 'loser_seed',  # Tournament seed numbers
+        'winner_rank', 'loser_rank',  # Player rankings
+        'winner_rank_points', 'loser_rank_points',  # Ranking points
+        'winner_ioc', 'loser_ioc',    # Player countries
+        'surface', 'tourney_level',   # Court type and tournament type
+        'winner_age', 'loser_age',    # Player ages
+        'winner_ht', 'loser_ht',      # Player heights
+        'w_ace', 'l_ace',            # Number of aces
+        'w_df', 'l_df',              # Number of double faults
+        'best_of'                     # Best of 3 or 5 sets
     ]
 
-    # --- Player Stats Calculation and Merging ---
-    # Check if IDs exist in the original DataFrame to calculate stats
-    new_stat_cols_added = [] # Keep track of columns added by merge
+    # Calculate how many matches each player has won
+    new_stat_cols_added = []
     if 'winner_id' in df.columns and 'loser_id' in df.columns:
-        print("Calculating and merging player stats...")
+        print("Calculating player stats...")
         try:
-            player_stats = calculate_player_stats(df) # Columns: matches_played, wins, win_percentage
+            player_stats = calculate_player_stats(df)
 
-            # Create explicit column names for merging to avoid conflicts
-            player_stats_w = player_stats.add_suffix('_w') # e.g., win_percentage_w
-            player_stats_l = player_stats.add_suffix('_l') # e.g., win_percentage_l
+            # Add stats for winners and losers
+            player_stats_w = player_stats.add_suffix('_w')
+            player_stats_l = player_stats.add_suffix('_l')
 
-            # Merge winner stats into the main df
+            # Add these stats to our main table
             df = pd.merge(df, player_stats_w, left_on='winner_id', right_index=True, how='left')
-            # Merge loser stats into the main df
             df = pd.merge(df, player_stats_l, left_on='loser_id', right_index=True, how='left')
 
-            # Get the list of the stat columns actually added
             new_stat_cols_added = list(player_stats_w.columns) + list(player_stats_l.columns)
-
-            # Add these new columns to the list of columns we eventually want to select
             columns_to_select.extend(new_stat_cols_added)
-            print(f"Added player stats columns: {new_stat_cols_added}")
+            print(f"Added player stats: {new_stat_cols_added}")
 
         except Exception as stat_e:
-             print(f"Error during player stats calculation/merge: {stat_e}")
-             # Continue without stats if calculation fails
-    else:
-        print("Skipping player stats calculation: 'winner_id' or 'loser_id' not found.")
+             print(f"Oops! Couldn't calculate player stats: {stat_e}")
 
-    # --- Feature Selection ---
-    # Select only the columns that actually exist in the (potentially augmented) df
+    # Pick only the columns we want to use
     existing_columns = [col for col in columns_to_select if col in df.columns]
-    print(f"Selecting {len(existing_columns)} features...")
-    # Create the final df_selected with the chosen features
+    print(f"Using {len(existing_columns)} features...")
     df_selected = df[existing_columns].copy()
 
-    # --- Imputation (now performed on df_selected) ---
-    print("Starting imputation on selected features...")
-    # Fill NaNs for seeds
+    # Fill in any missing information
+    print("Filling in missing information...")
+    
+    # Fill in missing seed numbers with 999
     if 'winner_seed' in df_selected.columns:
         df_selected['winner_seed'] = df_selected['winner_seed'].fillna(999)
     if 'loser_seed' in df_selected.columns:
         df_selected['loser_seed'] = df_selected['loser_seed'].fillna(999)
 
-    # Fill NaNs for the added stat columns (if any player had 0 matches, stats would be NaN/inf)
+    # Fill in missing player stats with 0
     for col in new_stat_cols_added:
         if col in df_selected.columns:
-            # Replace potential Infinities resulting from division by zero in stats
             df_selected[col] = df_selected[col].replace([np.inf, -np.inf], 0)
-            # Fill remaining NaNs (e.g., for players not found in merge) with 0
             df_selected[col] = df_selected[col].fillna(0)
 
-    # Fill other numeric features with median
+    # Fill in other missing numbers with the middle value
     numeric_cols = df_selected.select_dtypes(include=[np.number]).columns
     for col in numeric_cols:
-        # Avoid re-filling columns already handled (seeds, stats)
         if col not in ['winner_seed', 'loser_seed'] and col not in new_stat_cols_added:
-            # Check if column still has NaNs before filling
             if df_selected[col].isnull().any():
                 median_val = df_selected[col].median()
                 df_selected[col] = df_selected[col].fillna(median_val)
 
-    # Fill categorical features with mode
+    # Fill in missing text with the most common value
     categorical_cols = df_selected.select_dtypes(include=['object']).columns
     for col in categorical_cols:
          if df_selected[col].isnull().any():
              mode_val = df_selected[col].mode()
-             # Handle cases where mode() might return multiple values or empty
              if not mode_val.empty:
                 df_selected[col] = df_selected[col].fillna(mode_val[0])
              else:
-                 # Fallback if mode is empty (e.g., all values are NaN)
-                 df_selected[col] = df_selected[col].fillna("Unknown") # Or another placeholder
+                 df_selected[col] = df_selected[col].fillna("Unknown")
 
-
-    print("Imputation complete.")
-    # Final check for NaNs
-    if df_selected.isnull().sum().sum() > 0:
-        print("Warning: NaNs still present after imputation:")
-        print(df_selected.isnull().sum()[df_selected.isnull().sum() > 0])
-
-
+    print("All done cleaning up!")
     return df_selected
 
-# You also need the calculate_player_stats function (make sure it's correctly defined)
+# Calculate how many matches each player has won
 def calculate_player_stats(df):
-    # Combine winner and loser IDs to find all unique players
+    # Get a list of all unique players
     player_ids = pd.concat([df['winner_id'], df['loser_id']]).dropna().unique()
     stats = pd.DataFrame(index=player_ids)
 
-    # Calculate wins and losses for each player
+    # Count wins and losses for each player
     wins = df['winner_id'].value_counts()
     losses = df['loser_id'].value_counts()
 
-    # Combine to get total matches played
-    stats['matches_played'] = wins.add(losses, fill_value=0).astype(int) # Ensure integer type
-    stats['wins'] = wins.fillna(0).astype(int) # Fill NaN for players with 0 wins
-
-    # Calculate win percentage, handle division by zero
-    # Use .loc to avoid SettingWithCopyWarning if stats was a slice
-    stats['win_percentage'] = 0.0 # Initialize with float
-    # Calculate only where matches_played > 0
+    # Calculate total matches and win percentage
+    stats['matches_played'] = wins.add(losses, fill_value=0).astype(int)
+    stats['wins'] = wins.fillna(0).astype(int)
+    stats['win_percentage'] = 0.0
     stats.loc[stats['matches_played'] > 0, 'win_percentage'] = \
         stats['wins'] / stats['matches_played']
 
-    # Fill any remaining NaNs in stats DataFrame (e.g., if a player ID was NaN initially)
+    # Fill in any missing stats with 0
     stats = stats.fillna(0)
 
     print(f"Calculated stats for {len(stats)} players.")
     return stats
 
-# --------------------------
-# Create balanced dataset with winner and loser data
-# --------------------------
+# Step 3: Create a balanced dataset
 def create_balanced_dataset(df_selected):
     print("Creating balanced dataset...")
 
-    # create winner dataframe with target=1
-    df_winner = df_selected.copy()
+    # Make two copies of our data
+    df_winner = df_selected.copy()  # When player 1 wins
     df_winner['target'] = 1
-
-    # create loser dataframe with target=0
-    df_loser = df_selected.copy()
+    df_loser = df_selected.copy()   # When player 1 loses
     df_loser['target'] = 0
 
-    # rename columns to player1 and player2 format
+    # Rename columns to make it easier to understand
     winner_to_player1 = {
         'winner_seed': 'player1_seed',
         'loser_seed': 'player2_seed',
@@ -216,11 +189,11 @@ def create_balanced_dataset(df_selected):
         'l_df': 'player2_df'
     }
 
-    # only rename columns that exist in our dataset
+    # Only rename columns that exist in our data
     winner_rename = {k: v for k, v in winner_to_player1.items() if k in df_winner.columns}
     df_winner = df_winner.rename(columns=winner_rename)
 
-    # do the same for loser to player1 mapping
+    # Do the same for the loser data
     loser_to_player1 = {
         'winner_seed': 'player2_seed',
         'loser_seed': 'player1_seed',
@@ -243,26 +216,23 @@ def create_balanced_dataset(df_selected):
     loser_rename = {k: v for k, v in loser_to_player1.items() if k in df_loser.columns}
     df_loser = df_loser.rename(columns=loser_rename)
 
-    # combine datasets
+    # Put both datasets together
     df_balanced = pd.concat([df_winner, df_loser], axis=0).reset_index(drop=True)
 
-    # drop player ID columns if they exist
+    # Remove any ID columns we don't need
     id_cols = [col for col in df_balanced.columns if 'id' in col]
     df_balanced = df_balanced.drop(columns=id_cols, errors='ignore')
 
-
     return df_balanced
 
-# --------------------------
-# Encode Categorical Variables
-# --------------------------
+# Step 4: Convert text data to numbers
 def encode_and_prepare(df_balanced):
-    print("Encoding categorical variables...")
+    print("Converting text to numbers...")
 
-    # find categorical columns
+    # Find all text columns
     categorical_cols = df_balanced.select_dtypes(include=['object']).columns
 
-    # create label encoders for each categorical column
+    # Convert each text column to numbers
     encoders = {}
     for col in categorical_cols:
         df_balanced[col] = df_balanced[col].astype(str)
@@ -270,7 +240,7 @@ def encode_and_prepare(df_balanced):
         df_balanced[col] = le.fit_transform(df_balanced[col])
         encoders[col] = le
 
-    # final preprocessing
+    # Fill in any missing numbers
     for column in df_balanced.columns:
         if df_balanced[column].isnull().sum() > 0:
             if df_balanced[column].dtype == 'object':
@@ -278,50 +248,48 @@ def encode_and_prepare(df_balanced):
             else:
                 df_balanced[column] = df_balanced[column].fillna(df_balanced[column].median())
 
-    # add feature: Rank difference
+    # Add some helpful features
     if 'player1_rank' in df_balanced.columns and 'player2_rank' in df_balanced.columns:
         df_balanced['rank_diff'] = df_balanced['player2_rank'] - df_balanced['player1_rank']
 
-    # add feature: Height difference
     if 'player1_ht' in df_balanced.columns and 'player2_ht' in df_balanced.columns:
         df_balanced['height_diff'] = df_balanced['player1_ht'] - df_balanced['player2_ht']
 
-    # add feature: Age difference
     if 'player1_age' in df_balanced.columns and 'player2_age' in df_balanced.columns:
         df_balanced['age_diff'] = df_balanced['player1_age'] - df_balanced['player2_age']
 
     return df_balanced, encoders
 
-# --------------------------
-# Train Model
-# --------------------------
+# Step 5: Train our prediction model
 def train_model(df_balanced, model_type='decision_tree'):
-    print(f"Training model: {model_type}...")
+    print(f"Training {model_type} model...")
 
-    # preapre features and target
+    # Separate features (what we know) from target (what we want to predict)
     X = df_balanced.drop(columns=['target'])
     y = df_balanced['target']
 
-    # train-test split
+    # Split data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # create a pipeline with scaling and model
+    # Choose which model to use
     if model_type == 'decision_tree':
         pipeline = Pipeline([
             ('scaler', StandardScaler()),
             ('classifier', DecisionTreeClassifier(
                 random_state=42,
-                min_samples_leaf=50,  # Require more samples in leaf nodes
-                max_depth=5,          # Limit tree depth to prevent overfitting
-                min_samples_split=100  # Require more samples before splitting
+                min_samples_leaf=50,     # Need at least 50 matches in each leaf
+                max_depth=6,             # Tree can be 6 levels deep
+                min_samples_split=100,   # Need 100 matches to split a node
+                class_weight='balanced',  # Make sure we don't favor one player
+                criterion='entropy'       # Use entropy for better probabilities
             ))
         ])
         param_grid = {
-            'classifier__criterion': ['gini', 'entropy'],
+            'classifier__criterion': ['entropy'],
             'classifier__min_samples_leaf': [30, 50, 70],
-            'classifier__max_depth': [4, 5, 6],
+            'classifier__max_depth': [5, 6, 7],
             'classifier__min_samples_split': [80, 100, 120]
         }
 
@@ -346,95 +314,91 @@ def train_model(df_balanced, model_type='decision_tree'):
             'classifier__weights': ['uniform', 'distance']
         }
 
-    elif model_type == 'logistic_regression':  # LR kept for funsies can be removed later
+    elif model_type == 'logistic_regression':
         pipeline = Pipeline([
             ('scaler', StandardScaler()),
-            ('classifier', LogisticRegression(random_state=42, solver='liblinear'))  # added solver
+            ('classifier', LogisticRegression(random_state=42, solver='liblinear'))
         ])
         param_grid = {
             'classifier__penalty': ['l1', 'l2'],
             'classifier__C': [0.1, 1.0, 10.0]
         }
 
-
     else:
-        raise ValueError(f"Invalid model type: {model_type}")
+        raise ValueError(f"Don't know how to train {model_type} model!")
 
-    # gridsearchcv
+    # Find the best settings for our model
     grid_search = GridSearchCV(
         pipeline, param_grid, cv=5, scoring='accuracy', n_jobs=-1
     )
 
-    # fit the model
+    # Train the model
     grid_search.fit(X_train, y_train)
     best_model = grid_search.best_estimator_
 
-    # evalute model
+    # See how well our model works
     y_pred = best_model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
     print(f"Model accuracy ({model_type}): {accuracy:.4f}")
 
-    # cross-validation score
+    # Check if our model works well on different sets of matches
     cv_scores = cross_val_score(best_model, X, y, cv=5, scoring='accuracy')
     print(f"Cross-validation accuracy ({model_type}): {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
-    # get important features (using feature_importances_ for tree-based models)
+    # Find out which features are most important
     feature_importance = None
-    if hasattr(best_model['classifier'], 'feature_importances_'):  #for Decision Trees and Random Forests
+    if hasattr(best_model['classifier'], 'feature_importances_'):
         feature_importance = pd.DataFrame({
             'feature': X.columns,
             'importance': best_model['classifier'].feature_importances_
         }).sort_values('importance', ascending=False)
         print("\nTop 10 important features:")
         print(feature_importance.head(10))
-    elif hasattr(best_model['classifier'], 'coef_'):  #for Logistic Regression
+    elif hasattr(best_model['classifier'], 'coef_'):
         feature_importance = pd.DataFrame({
             'feature': X.columns,
-            'importance': best_model['classifier'].coef_[0]  # use the first row of coefficients
+            'importance': best_model['classifier'].coef_[0]
         }).sort_values('importance', ascending=False)
         print("\nTop 10 important features:")
         print(feature_importance.head(10))
 
     return best_model, feature_importance
 
-
-# --------------------------
-# Main Function
-# --------------------------
+# Main program
 def main():
-    # create output directory if it doesn't exist
+    # Create a folder to save our models
     os.makedirs('public', exist_ok=True)
 
-    # load data
     try:
+        # Step 1: Load the data
         combined_df = load_datasets(data_dir)
         print(f"Loaded {len(combined_df)} total matches")
 
-        # preprocess data
+        # Step 2: Clean up the data
         df_selected = preprocess_data(combined_df)
         print(f"Selected features for {len(df_selected)} matches")
 
-        # create balanced dataset
+        # Step 3: Create balanced dataset
         df_balanced = create_balanced_dataset(df_selected)
         print(f"Created balanced dataset with {len(df_balanced)} examples")
 
-        # encode categorical variables
+        # Step 4: Convert text to numbers
         df_balanced, encoders = encode_and_prepare(df_balanced)
 
-        # train models
-        model_types = ['decision_tree', 'random_forest', 'knn', 'logistic_regression']  # Add logistic regression
+        # Step 5: Train different types of models
+        model_types = ['decision_tree', 'random_forest', 'knn', 'logistic_regression']
 
         for model_type in model_types:
             model, feature_importance = train_model(df_balanced, model_type=model_type)
 
-            # save model and encoders
+            # Save our trained model
             pickle.dump(model, open(f'public/model_{model_type}.pkl', 'wb'))
 
-            # save feature importance if available
+            # Save which features are most important
             if feature_importance is not None:
                 feature_importance.to_csv(f'public/feature_importance_{model_type}.csv', index=False)
 
-            # save label encoders (only save once, as they are the same for all models)
+            # Save our text-to-number converters
             if model_type == 'decision_tree':
                 for name, encoder in encoders.items():
                     pickle.dump(encoder, open(f'public/le_{name}.pkl', 'wb'))
@@ -442,7 +406,7 @@ def main():
             print(f"Model ({model_type}) trained and saved successfully!")
 
     except Exception as e:
-        print(f"Error in model training: {e}")
+        print(f"Oops! Something went wrong: {e}")
         import traceback
         traceback.print_exc()
 
