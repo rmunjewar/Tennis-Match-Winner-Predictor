@@ -362,6 +362,8 @@ export default {
     },
     onSubmit() {
       console.log("onSubmit triggered");
+      console.log("Surface:", this.surface);
+      console.log("Tournament Level:", this.tourneyLevel);
       console.log("Custom Player 1 Data:", JSON.stringify(this.customPlayer1));
       console.log("Custom Player 2 Data:", JSON.stringify(this.customPlayer2));
       this.loading = true;
@@ -405,6 +407,7 @@ export default {
         tourney_level: this.tourneyLevel,
       };
 
+      console.log("Final input data:", inputData);
       this.$emit("prediction", inputData);
 
       setTimeout(() => {

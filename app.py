@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from flask_cors import CORS
 import glob
+from sklearn.pipeline import Pipeline
 import os
 
 app = Flask(__name__)
@@ -143,23 +144,16 @@ def predict():
                         df[col] = 0
         
         # Make predictions with each model
-        models = {
-            'decision_tree': 'public/model_decision_tree.pkl',
-            'random_forest': 'public/model_random_forest.pkl',
-            'knn': 'public/model_knn.pkl'
-        }
-        
         results = {}
         
-        for model_name, model_path in models.items():
+        for model_name in model_names:
             try:
-                if not os.path.exists(model_path):
-                    raise FileNotFoundError(f"Model file not found: {model_path}")
-                    
-                model = pickle.load(open(model_path, 'rb'))
+                # Get the model from our loaded models dictionary
+                model = models.get(model_name)
+                if model is None:
+                    raise ValueError(f"Model {model_name} not found in loaded models")
                 
-                # IMPORTANT: Make sure df has the same columns in the same order as during training
-                # Get feature names from the model if available
+                # Get feature names from the model
                 if hasattr(model, 'feature_names_in_'):
                     feature_names = model.feature_names_in_
                 else:
@@ -175,9 +169,15 @@ def predict():
                         # If feature is missing, add with default values
                         prediction_df[feature] = 0
                 
-                # Now make prediction with properly ordered features
+                # Make prediction
                 prediction_val = model.predict(prediction_df)[0]
                 probability = model.predict_proba(prediction_df)[0]
+                
+                # Log the prediction details for debugging
+                print(f"\nPrediction details for {model_name}:")
+                print(f"Input features: {prediction_df.to_dict('records')[0]}")
+                print(f"Prediction value: {prediction_val}")
+                print(f"Probabilities: {probability}")
                 
                 results[model_name] = {
                     'prediction': int(prediction_val),

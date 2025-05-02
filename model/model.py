@@ -311,11 +311,18 @@ def train_model(df_balanced, model_type='decision_tree'):
     if model_type == 'decision_tree':
         pipeline = Pipeline([
             ('scaler', StandardScaler()),
-            ('classifier', DecisionTreeClassifier(random_state=42))
+            ('classifier', DecisionTreeClassifier(
+                random_state=42,
+                min_samples_leaf=50,  # Require more samples in leaf nodes
+                max_depth=5,          # Limit tree depth to prevent overfitting
+                min_samples_split=100  # Require more samples before splitting
+            ))
         ])
         param_grid = {
-            'classifier__max_depth': [3, 5, 7, None],
-            'classifier__min_samples_split': [2, 5, 10]
+            'classifier__criterion': ['gini', 'entropy'],
+            'classifier__min_samples_leaf': [30, 50, 70],
+            'classifier__max_depth': [4, 5, 6],
+            'classifier__min_samples_split': [80, 100, 120]
         }
 
     elif model_type == 'random_forest':
