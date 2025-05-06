@@ -70,101 +70,161 @@ export async function getMockPrediction(data) {
   return new Promise((resolve) => {
     // simulate API delay
     setTimeout(() => {
-      // more sophisticated logic that takes into account different factors
+      // Initialize default values
       const p1Rank = data.player1_rank || 100;
       const p2Rank = data.player2_rank || 100;
+      const p1Age = data.player1_age || 25;
+      const p2Age = data.player2_age || 25;
+      const p1Height = data.player1_ht || 185;
+      const p2Height = data.player2_ht || 185;
+      const p1Aces = data.player1_ace || 0;
+      const p2Aces = data.player2_ace || 0;
+      const p1DF = data.player1_df || 0;
+      const p2DF = data.player2_df || 0;
+      const p1Wins = data.wins_w || 0;
+      const p2Wins = data.wins_l || 0;
+      const p1Matches = data.matches_played_w || 1;
+      const p2Matches = data.matches_played_l || 1;
 
-      // calc rank advantage (0-0.3 range)
+      // Calculate various factors (all normalized between -1 and 1)
+      
+      // 1. Ranking Factor (0-0.3 range)
       const rankDiff = Math.abs(p1Rank - p2Rank);
       const rankAdvantage = Math.min(0.3, rankDiff / 200);
       const rankFactor = p1Rank < p2Rank ? rankAdvantage : -rankAdvantage;
 
-      // age factor (younger players have slight advantage, 0-0.1 range)
-      const p1Age = data.player1_age || 25;
-      const p2Age = data.player2_age || 25;
-      const ageDiff = Math.abs(p1Age - p2Age);
-      const ageFactor = ageDiff > 5 ? (p1Age < p2Age ? 0.1 : -0.1) : 0;
+      // 2. Age Factor (0-0.15 range)
+      // Younger players have advantage, but not too young (experience matters)
+      const ageDiff = p1Age - p2Age;
+      let ageFactor = 0;
+      if (Math.abs(ageDiff) > 2) {
+        // Optimal age range is 24-28
+        const p1AgeFactor = Math.max(-0.15, Math.min(0.15, (24 - p1Age) / 10));
+        const p2AgeFactor = Math.max(-0.15, Math.min(0.15, (24 - p2Age) / 10));
+        ageFactor = p1AgeFactor - p2AgeFactor;
+      }
 
-      // surface factor based on surface preference (simplified)
+      // 3. Surface Factor (0-0.2 range)
       let surfaceFactor = 0;
-      if (data.surface === "Clay") {
-        // clay specialists (like Spanish and South American players)
-        if (data.player1_ioc === "ESP" || data.player1_ioc === "ARG") {
-          surfaceFactor = 0.15;
-        } else if (data.player2_ioc === "ESP" || data.player2_ioc === "ARG") {
-          surfaceFactor = -0.15;
-        }
-      } else if (data.surface === "Grass") {
-        // grass specialists (like British and Australian players)
-        if (data.player1_ioc === "GBR" || data.player1_ioc === "AUS") {
-          surfaceFactor = 0.15;
-        } else if (data.player2_ioc === "GBR" || data.player2_ioc === "AUS") {
-          surfaceFactor = -0.15;
+      if (data.surface) {
+        // Surface specialists by country
+        const claySpecialists = ["ESP", "ARG", "ITA", "FRA", "BRA"];
+        const grassSpecialists = ["GBR", "AUS", "USA", "CAN"];
+        const hardSpecialists = ["USA", "RUS", "JPN", "KOR", "CHN"];
+
+        const surfaceWeight = 0.2;
+        if (data.surface === "Clay" && claySpecialists.includes(data.player1_ioc)) {
+          surfaceFactor = surfaceWeight;
+        } else if (data.surface === "Clay" && claySpecialists.includes(data.player2_ioc)) {
+          surfaceFactor = -surfaceWeight;
+        } else if (data.surface === "Grass" && grassSpecialists.includes(data.player1_ioc)) {
+          surfaceFactor = surfaceWeight;
+        } else if (data.surface === "Grass" && grassSpecialists.includes(data.player2_ioc)) {
+          surfaceFactor = -surfaceWeight;
+        } else if (data.surface === "Hard" && hardSpecialists.includes(data.player1_ioc)) {
+          surfaceFactor = surfaceWeight * 0.8; // Slightly less impact for hard courts
+        } else if (data.surface === "Hard" && hardSpecialists.includes(data.player2_ioc)) {
+          surfaceFactor = -surfaceWeight * 0.8;
         }
       }
 
-      // height factor (taller players have advantage on faster surfaces)
-      const p1Height = data.player1_ht || 185;
-      const p2Height = data.player2_ht || 185;
+      // 4. Height Factor (0-0.15 range)
+      // Height advantage varies by surface
       const heightDiff = p1Height - p2Height;
       let heightFactor = 0;
-
       if (Math.abs(heightDiff) > 5) {
-        if (data.surface === "Grass" || data.surface === "Hard") {
-          heightFactor = heightDiff > 0 ? 0.1 : -0.1;
+        const heightWeight = 0.15;
+        if (data.surface === "Grass") {
+          // Height matters most on grass
+          heightFactor = (heightDiff / 20) * heightWeight;
+        } else if (data.surface === "Hard") {
+          // Moderate impact on hard courts
+          heightFactor = (heightDiff / 25) * heightWeight;
+        } else if (data.surface === "Clay") {
+          // Least impact on clay
+          heightFactor = (heightDiff / 30) * heightWeight;
         }
       }
 
-      // calc total factor (ranges from -0.65 to 0.65)
-      const totalFactor = rankFactor + ageFactor + surfaceFactor + heightFactor;
+      // 5. Serve Factor (0-0.15 range)
+      // Based on aces and double faults
+      const p1ServeQuality = (p1Aces - p1DF * 2) / 10;
+      const p2ServeQuality = (p2Aces - p2DF * 2) / 10;
+      const serveFactor = Math.max(-0.15, Math.min(0.15, (p1ServeQuality - p2ServeQuality) / 10));
 
-      // convert to probability (0.5 means even match, above 0.5 means player 1 has advantage)
-      let probability = 0.5 + totalFactor;
+      // 6. Form Factor (0-0.2 range)
+      // Based on recent win percentage
+      const p1WinRate = p1Wins / p1Matches;
+      const p2WinRate = p2Wins / p2Matches;
+      const formFactor = Math.max(-0.2, Math.min(0.2, (p1WinRate - p2WinRate) * 2));
 
-      // clamp to valid probability range
+      // Calculate total factor (ranges from -1 to 1)
+      const totalFactor = (
+        rankFactor * 0.3 +      // 30% weight
+        ageFactor * 0.15 +      // 15% weight
+        surfaceFactor * 0.2 +   // 20% weight
+        heightFactor * 0.15 +   // 15% weight
+        serveFactor * 0.1 +     // 10% weight
+        formFactor * 0.1        // 10% weight
+      );
+
+      // Convert to probability (0.5 means even match)
+      let probability = 0.5 + (totalFactor / 2);
+
+      // Clamp to valid probability range
       probability = Math.max(0.1, Math.min(0.9, probability));
 
-      // determine winner and confidence
+      // Determine winner and confidence
       const winner = probability > 0.5 ? 1 : 2;
       const confidence = winner === 1 ? probability : 1 - probability;
 
-      // generate factors for analysis
+      // Generate factors for analysis
       const factors = [];
 
-      // onyl include significant factors
+      // Only include significant factors
       if (Math.abs(rankFactor) > 0.05) {
         const betterPlayer = rankFactor > 0 ? 1 : 2;
         factors.push(
-          `Player ${betterPlayer}'s higher ranking (${Math.abs(
-            p1Rank - p2Rank
-          )} positions difference)`
+          `Player ${betterPlayer}'s higher ranking (${Math.abs(p1Rank - p2Rank)} positions difference)`
         );
       }
 
       if (Math.abs(ageFactor) > 0.05) {
         const youngerPlayer = p1Age < p2Age ? 1 : 2;
         factors.push(
-          `Player ${youngerPlayer} is younger (${Math.abs(
-            p1Age - p2Age
-          ).toFixed(1)} years difference)`
+          `Player ${youngerPlayer}'s age advantage (${Math.abs(p1Age - p2Age).toFixed(1)} years difference)`
         );
       }
 
       if (Math.abs(surfaceFactor) > 0.05) {
         const betterId = surfaceFactor > 0 ? 1 : 2;
         factors.push(
-          `Player ${betterId}'s preference for ${data.surface} courts`
+          `Player ${betterId}'s experience on ${data.surface} courts`
         );
       }
 
       if (Math.abs(heightFactor) > 0.05) {
         const tallerId = heightFactor > 0 ? 1 : 2;
         factors.push(
-          `Player ${tallerId}'s height advantage (${Math.abs(heightDiff)} cm)`
+          `Player ${tallerId}'s height advantage (${Math.abs(heightDiff)} cm) on ${data.surface}`
         );
       }
 
-      // create response object
+      if (Math.abs(serveFactor) > 0.05) {
+        const betterServer = serveFactor > 0 ? 1 : 2;
+        factors.push(
+          `Player ${betterServer}'s superior serving (${Math.abs(p1Aces - p2Aces)} more aces)`
+        );
+      }
+
+      if (Math.abs(formFactor) > 0.05) {
+        const betterForm = formFactor > 0 ? 1 : 2;
+        factors.push(
+          `Player ${betterForm}'s better recent form (${Math.abs((p1WinRate - p2WinRate) * 100).toFixed(1)}% higher win rate)`
+        );
+      }
+
+      // Create response object
       const result = {
         winner: winner,
         confidence: parseFloat((confidence * 100).toFixed(1)),
@@ -175,12 +235,18 @@ export async function getMockPrediction(data) {
               : confidence > 0.6
               ? "moderately"
               : "slightly"
-          } favored to win this match with ${(confidence * 100).toFixed(
-            1
-          )}% confidence.`,
+          } favored to win this match with ${(confidence * 100).toFixed(1)}% confidence.`,
           factors: factors,
-          disclaimer: "this a mock prediction for testing purposes only.",
-        },
+          disclaimer: "This is a mock prediction for testing purposes only.",
+          detailed_analysis: {
+            ranking_impact: parseFloat((rankFactor * 100).toFixed(1)),
+            age_impact: parseFloat((ageFactor * 100).toFixed(1)),
+            surface_impact: parseFloat((surfaceFactor * 100).toFixed(1)),
+            height_impact: parseFloat((heightFactor * 100).toFixed(1)),
+            serve_impact: parseFloat((serveFactor * 100).toFixed(1)),
+            form_impact: parseFloat((formFactor * 100).toFixed(1))
+          }
+        }
       };
 
       resolve(result);

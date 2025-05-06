@@ -20,13 +20,11 @@ data_dir = "data"
 
 # Step 1: Load tennis match data
 def load_datasets(data_dir):
-    print("Loading tennis match data...")
     
     # Look for tennis match files on our computer
     all_files = glob.glob(os.path.join(data_dir, "atp_matches_*.csv"))
 
     if not all_files:
-        print("No files found on computer. Getting data from internet...")
         # If no files on computer, get them from internet
         years = range(2021, 2024)
         dfs = []
@@ -57,7 +55,6 @@ def load_datasets(data_dir):
 
 # Step 2: Clean up and prepare the data
 def preprocess_data(df):
-    print("Cleaning up the data...")
 
     # These are the things we want to know about each match
     columns_to_select = [
@@ -76,7 +73,6 @@ def preprocess_data(df):
     # Calculate how many matches each player has won
     new_stat_cols_added = []
     if 'winner_id' in df.columns and 'loser_id' in df.columns:
-        print("Calculating player stats...")
         try:
             player_stats = calculate_player_stats(df)
 
@@ -97,11 +93,10 @@ def preprocess_data(df):
 
     # Pick only the columns we want to use
     existing_columns = [col for col in columns_to_select if col in df.columns]
-    print(f"Using {len(existing_columns)} features...")
+    print(f"Using {len(existing_columns)} features")
     df_selected = df[existing_columns].copy()
 
     # Fill in any missing information
-    print("Filling in missing information...")
     
     # Fill in missing seed numbers with 999
     if 'winner_seed' in df_selected.columns:
@@ -161,7 +156,6 @@ def calculate_player_stats(df):
 
 # Step 3: Create a balanced dataset
 def create_balanced_dataset(df_selected):
-    print("Creating balanced dataset...")
 
     # Make two copies of our data
     df_winner = df_selected.copy()  # When player 1 wins
@@ -227,7 +221,6 @@ def create_balanced_dataset(df_selected):
 
 # Step 4: Convert text data to numbers
 def encode_and_prepare(df_balanced):
-    print("Converting text to numbers...")
 
     # Find all text columns
     categorical_cols = df_balanced.select_dtypes(include=['object']).columns
@@ -262,7 +255,7 @@ def encode_and_prepare(df_balanced):
 
 # Step 5: Train our prediction model
 def train_model(df_balanced, model_type='decision_tree'):
-    print(f"Training {model_type} model...")
+    print(f"Training {model_type} model")
 
     # Separate features (what we know) from target (what we want to predict)
     X = df_balanced.drop(columns=['target'])
@@ -366,7 +359,7 @@ def train_model(df_balanced, model_type='decision_tree'):
 
 # Main program
 def main():
-    # Create a folder to save our models
+    # Create a folder to save our models if it doesn't exist
     os.makedirs('public', exist_ok=True)
 
     try:
