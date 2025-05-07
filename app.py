@@ -1,5 +1,4 @@
 # This is our web server that helps predict tennis match winners!
-# It takes information about two players and tells us who might win.
 
 from flask import Flask, request, jsonify
 import pickle
@@ -19,35 +18,33 @@ CORS(app)  # This lets our website talk to our server
 models = {}
 encoders = {}
 expected_cols = []
-model_names = ['decision_tree', 'random_forest', 'knn']  # The types of models we'll use
+model_names = ['decision_tree', 'random_forest', 'knn']  # The types of models we are using
 
 try:
     print("Loading our prediction tools...")
     # Load our text-to-number converters
     encoder_files = glob.glob("public/le_*.pkl")
     if not encoder_files:
-        print("Warning: No converter files found. Some predictions might not work.")
+        print("No convertor files found")
     for file in encoder_files:
         name = os.path.splitext(os.path.basename(file))[0][3:]
         try:
             with open(file, 'rb') as f:
                 encoders[name] = pickle.load(f)
-            print(f"Loaded converter: {name}")
         except Exception as e:
-            print(f"Oops! Couldn't load converter {file}: {e}")
+            print(f" ouldn't load converter {file}: {e}")
 
-    # Load our trained models
+    # Load trained models
     for name in model_names:
         model_path = f'public/model_{name}.pkl'
         if os.path.exists(model_path):
             try:
                 with open(model_path, 'rb') as f:
                     models[name] = pickle.load(f)
-                print(f"Loaded model: {name}")
             except Exception as e:
-                print(f"Oops! Couldn't load model {model_path}: {e}")
+                print(f"couldn't load model {model_path}: {e}")
         else:
-            print(f"Warning: Model file not found: {model_path}")
+            print(f"Model file not found - {model_path}")
 
     # Load the list of things we need to know about each match
     feature_file = 'public/feature_importance_random_forest.csv'
@@ -56,24 +53,15 @@ try:
             feature_importance_df = pd.read_csv(feature_file)
             if 'feature' in feature_importance_df.columns:
                 expected_cols = feature_importance_df['feature'].tolist()
-                print(f"Loaded list of match details ({len(expected_cols)} items)")
-                print("We need to know about:", expected_cols)
             else:
-                print(f"Warning: Couldn't find the list of match details in {feature_file}")
+                print(f"couldn't find the list of match details in {feature_file}")
         except Exception as e:
-            print(f"Oops! Couldn't read the list of match details: {e}")
+            print(f"couldn't read the list of match details: {e}")
     else:
-        print(f"Warning: Couldn't find the list of match details file")
-
-    if not models:
-        print("Error: No models loaded. Predictions won't work!")
-    if not encoders:
-        print("Warning: No converters loaded. Some predictions might not work.")
-    if not expected_cols and models:
-        print("Warning: Couldn't find the list of match details. Predictions might be wrong.")
+        print(f"couldn't find the list of match details file")
 
 except Exception as e:
-    print(f"Oops! Something went wrong while loading: {e}")
+    print(f"something went wrong while loading: {e}")
 
 # This is where our website sends match information to get predictions
 @app.route('/api/predict', methods=['POST'])
@@ -171,7 +159,7 @@ def predict():
                 probability = model.predict_proba(prediction_df)[0]
                 
                 # Print what the model thinks
-                print(f"\nWhat {model_name} thinks:")
+                print(f"\n{model_name}:")
                 print(f"Match information: {prediction_df.to_dict('records')[0]}")
                 print(f"Prediction: {prediction_val}")
                 print(f"Probabilities: {probability}")
@@ -203,7 +191,7 @@ def predict():
         return jsonify(response)
         
     except Exception as e:
-        print(f"Oops! Something went wrong: {str(e)}")
+        print(f"something went wrong: {str(e)}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -218,11 +206,11 @@ def model_info():
                 top_features = feature_importance_df.head(10).to_dict(orient='records')
                 return jsonify({'top_features_random_forest': top_features}) 
             else:
-                return jsonify({'error': "Couldn't find the list of important details"}), 500
+                return jsonify({'error'}), 500
         except Exception as e:
-            return jsonify({'error': f"Couldn't read the list of important details: {str(e)}"}), 500
+            return jsonify({'error'}), 500
     else:
-        return jsonify({'error': "Couldn't find the list of important details"}), 500
+        return jsonify({'error'}), 500
 
 # Start our web server
 if __name__ == '__main__':

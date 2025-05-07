@@ -26,21 +26,19 @@ def load_datasets(data_dir):
 
     if not all_files:
         # If no files on computer, get them from internet
-        years = range(2021, 2024)
+        years = range(2017, 2024)
         dfs = []
 
         for year in years:
             url = f"https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_{year}.csv"  
-            print(f"Getting {year} matches from {url}")
             try:
                 df = pd.read_csv(url)
                 dfs.append(df)
-                print(f"Got {len(df)} matches from {year}")
             except Exception as e:
-                print(f"Oops! Couldn't get {year} data: {e}")
+                print(f"couldn't get {year} data: {e}")
 
         if not dfs:
-            print("Using just 2023 matches")
+            print("Using just 2023 matches if all else fails")
             url = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_matches_2023.csv"
             dfs = [pd.read_csv(url)]
     else:
@@ -65,8 +63,8 @@ def preprocess_data(df):
         'surface', 'tourney_level',   # Court type and tournament type
         'winner_age', 'loser_age',    # Player ages
         'winner_ht', 'loser_ht',      # Player heights
-        'w_ace', 'l_ace',            # Number of aces
-        'w_df', 'l_df',              # Number of double faults
+        # 'w_ace', 'l_ace',            # Number of aces
+        # 'w_df', 'l_df',              # Number of double faults
         'best_of'                     # Best of 3 or 5 sets
     ]
 
@@ -307,18 +305,18 @@ def train_model(df_balanced, model_type='decision_tree'):
             'classifier__weights': ['uniform', 'distance']
         }
 
-    elif model_type == 'logistic_regression':
-        pipeline = Pipeline([
-            ('scaler', StandardScaler()),
-            ('classifier', LogisticRegression(random_state=42, solver='liblinear'))
-        ])
-        param_grid = {
-            'classifier__penalty': ['l1', 'l2'],
-            'classifier__C': [0.1, 1.0, 10.0]
-        }
+    # elif model_type == 'logistic_regression':
+    #     pipeline = Pipeline([
+    #         ('scaler', StandardScaler()),
+    #         ('classifier', LogisticRegression(random_state=42, solver='liblinear'))
+    #     ])
+    #     param_grid = {
+    #         'classifier__penalty': ['l1', 'l2'],
+    #         'classifier__C': [0.1, 1.0, 10.0]
+    #     }
 
     else:
-        raise ValueError(f"Don't know how to train {model_type} model!")
+        print("Model not trained")
 
     # Find the best settings for our model
     grid_search = GridSearchCV(
@@ -338,15 +336,17 @@ def train_model(df_balanced, model_type='decision_tree'):
     cv_scores = cross_val_score(best_model, X, y, cv=5, scoring='accuracy')
     print(f"Cross-validation accuracy ({model_type}): {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
-    # Find out which features are most important
+    # Listing which features are most important
     feature_importance = None
     if hasattr(best_model['classifier'], 'feature_importances_'):
+
         feature_importance = pd.DataFrame({
             'feature': X.columns,
             'importance': best_model['classifier'].feature_importances_
         }).sort_values('importance', ascending=False)
         print("\nTop 10 important features:")
         print(feature_importance.head(10))
+
     elif hasattr(best_model['classifier'], 'coef_'):
         feature_importance = pd.DataFrame({
             'feature': X.columns,
@@ -359,9 +359,8 @@ def train_model(df_balanced, model_type='decision_tree'):
 
 # Main program
 def main():
-    # Create a folder to save our models if it doesn't exist
     os.makedirs('public', exist_ok=True)
-
+    # comments for debugging below
     try:
         # Step 1: Load the data
         combined_df = load_datasets(data_dir)
@@ -399,7 +398,7 @@ def main():
             print(f"Model ({model_type}) trained and saved successfully!")
 
     except Exception as e:
-        print(f"Oops! Something went wrong: {e}")
+        print(f"Something went wrong: {e}")
         import traceback
         traceback.print_exc()
 

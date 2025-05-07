@@ -51,7 +51,7 @@ export async function getModelInfo() {
     const response = await fetch(`${API_BASE_URL}/model-info`);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      throw new Error(`HTTP error - Status: ${response.status}`);
     }
 
     return await response.json();
@@ -62,15 +62,14 @@ export async function getModelInfo() {
 }
 
 /**
- * for development and testing without a backend
  * @param {Object} data - Player and match data
- * @returns {Promise<Object>} - Mock prediction result with simulated analysis
+ * @returns {Promise<Object>} - Mock prediction result with simulated analysis - under development
  */
 export async function getMockPrediction(data) {
   return new Promise((resolve) => {
     // simulate API delay
     setTimeout(() => {
-      // Initialize default values
+      // initialize default values
       const p1Rank = data.player1_rank || 100;
       const p2Rank = data.player2_rank || 100;
       const p1Age = data.player1_age || 25;
@@ -86,28 +85,26 @@ export async function getMockPrediction(data) {
       const p1Matches = data.matches_played_w || 1;
       const p2Matches = data.matches_played_l || 1;
 
-      // Calculate various factors (all normalized between -1 and 1)
+      // calculate various factors (all normalized between -1 and 1)
       
-      // 1. Ranking Factor (0-0.3 range)
+      // 1. ranking fFactor (0-0.3 range)
       const rankDiff = Math.abs(p1Rank - p2Rank);
       const rankAdvantage = Math.min(0.3, rankDiff / 200);
       const rankFactor = p1Rank < p2Rank ? rankAdvantage : -rankAdvantage;
 
-      // 2. Age Factor (0-0.15 range)
+      // 2. age factor (0-0.15 range)
       // Younger players have advantage, but not too young (experience matters)
       const ageDiff = p1Age - p2Age;
       let ageFactor = 0;
       if (Math.abs(ageDiff) > 2) {
-        // Optimal age range is 24-28
         const p1AgeFactor = Math.max(-0.15, Math.min(0.15, (24 - p1Age) / 10));
         const p2AgeFactor = Math.max(-0.15, Math.min(0.15, (24 - p2Age) / 10));
         ageFactor = p1AgeFactor - p2AgeFactor;
       }
 
-      // 3. Surface Factor (0-0.2 range)
+      // 3. surface factor (0-0.2 range)
       let surfaceFactor = 0;
       if (data.surface) {
-        // Surface specialists by country
         const claySpecialists = ["ESP", "ARG", "ITA", "FRA", "BRA"];
         const grassSpecialists = ["GBR", "AUS", "USA", "CAN"];
         const hardSpecialists = ["USA", "RUS", "JPN", "KOR", "CHN"];
@@ -122,14 +119,13 @@ export async function getMockPrediction(data) {
         } else if (data.surface === "Grass" && grassSpecialists.includes(data.player2_ioc)) {
           surfaceFactor = -surfaceWeight;
         } else if (data.surface === "Hard" && hardSpecialists.includes(data.player1_ioc)) {
-          surfaceFactor = surfaceWeight * 0.8; // Slightly less impact for hard courts
+          surfaceFactor = surfaceWeight * 0.8; // using slightly less impact for hard courts
         } else if (data.surface === "Hard" && hardSpecialists.includes(data.player2_ioc)) {
           surfaceFactor = -surfaceWeight * 0.8;
         }
       }
 
-      // 4. Height Factor (0-0.15 range)
-      // Height advantage varies by surface
+      // 4. hiehgt factor (0-0.15 range)
       const heightDiff = p1Height - p2Height;
       let heightFactor = 0;
       if (Math.abs(heightDiff) > 5) {
@@ -146,42 +142,42 @@ export async function getMockPrediction(data) {
         }
       }
 
-      // 5. Serve Factor (0-0.15 range)
-      // Based on aces and double faults
-      const p1ServeQuality = (p1Aces - p1DF * 2) / 10;
-      const p2ServeQuality = (p2Aces - p2DF * 2) / 10;
-      const serveFactor = Math.max(-0.15, Math.min(0.15, (p1ServeQuality - p2ServeQuality) / 10));
+      // 5. serve factor (0-0.15 range)
+      // based on aces and double faults
+      // const p1ServeQuality = (p1Aces - p1DF * 2) / 10;
+      // const p2ServeQuality = (p2Aces - p2DF * 2) / 10;
+      // const serveFactor = Math.max(-0.15, Math.min(0.15, (p1ServeQuality - p2ServeQuality) / 10));
 
-      // 6. Form Factor (0-0.2 range)
+      // 6. form factor (0-0.2 range)
       // Based on recent win percentage
       const p1WinRate = p1Wins / p1Matches;
       const p2WinRate = p2Wins / p2Matches;
       const formFactor = Math.max(-0.2, Math.min(0.2, (p1WinRate - p2WinRate) * 2));
 
-      // Calculate total factor (ranges from -1 to 1)
+      // calculate total factor (ranges from -1 to 1)
       const totalFactor = (
-        rankFactor * 0.3 +      // 30% weight
+        rankFactor * 0.35 +      // 30% weight
         ageFactor * 0.15 +      // 15% weight
         surfaceFactor * 0.2 +   // 20% weight
-        heightFactor * 0.15 +   // 15% weight
-        serveFactor * 0.1 +     // 10% weight
+        heightFactor * 0.2 +   // 15% weight
+        // serveFactor * 0.1 +     // 10% weight
         formFactor * 0.1        // 10% weight
       );
 
-      // Convert to probability (0.5 means even match)
+      // Convert to porbability (0.5 means even match)
       let probability = 0.5 + (totalFactor / 2);
 
       // Clamp to valid probability range
       probability = Math.max(0.1, Math.min(0.9, probability));
 
-      // Determine winner and confidence
+      // Determine winner & confidence
       const winner = probability > 0.5 ? 1 : 2;
       const confidence = winner === 1 ? probability : 1 - probability;
 
-      // Generate factors for analysis
+      // generate factors for analysis
       const factors = [];
 
-      // Only include significant factors
+      // significant factors
       if (Math.abs(rankFactor) > 0.05) {
         const betterPlayer = rankFactor > 0 ? 1 : 2;
         factors.push(
@@ -224,7 +220,7 @@ export async function getMockPrediction(data) {
         );
       }
 
-      // Create response object
+      // response object
       const result = {
         winner: winner,
         confidence: parseFloat((confidence * 100).toFixed(1)),
@@ -237,7 +233,7 @@ export async function getMockPrediction(data) {
               : "slightly"
           } favored to win this match with ${(confidence * 100).toFixed(1)}% confidence.`,
           factors: factors,
-          disclaimer: "This is a mock prediction for testing purposes only.",
+          disclaimer: "This is a mock prediction for development purposes only in terms of this project",
           detailed_analysis: {
             ranking_impact: parseFloat((rankFactor * 100).toFixed(1)),
             age_impact: parseFloat((ageFactor * 100).toFixed(1)),

@@ -184,7 +184,7 @@ export default {
       tourneyLevel: "G",
       loading: false,
 
-      // constant players users choose from
+      // constant players users choose from - top 16 players
       players: [
         {
           name: "Novak Djokovic",
