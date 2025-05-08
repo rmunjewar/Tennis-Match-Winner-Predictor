@@ -256,7 +256,7 @@ def train_model(df_balanced, model_type='decision_tree'):
     print(f"Training {model_type} model")
 
     # Separate features (what we know) from target (what we want to predict)
-    X = df_balanced.drop(columns=['target'])
+    X = df_balanced[['tourney_level', 'surface', 'player1_age', 'player2_age', 'player1_ht', 'player2_ht', 'player1_ioc', 'player2_ioc', 'player1_rank', 'player2_rank', 'player1_seed', 'player2_seed']].copy()
     y = df_balanced['target']
 
     # Split data into training and testing sets
@@ -359,6 +359,7 @@ def train_model(df_balanced, model_type='decision_tree'):
 
 # Main program
 def main():
+    print("✅ Starting model.py...")
     os.makedirs('public', exist_ok=True)
     # comments for debugging below
     try:
@@ -394,6 +395,7 @@ def main():
             if model_type == 'decision_tree':
                 for name, encoder in encoders.items():
                     pickle.dump(encoder, open(f'public/le_{name}.pkl', 'wb'))
+            
 
             print(f"Model ({model_type}) trained and saved successfully!")
 

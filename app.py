@@ -154,6 +154,8 @@ def predict():
                     else:
                         prediction_df[feature] = 0
                 
+                prediction_df = prediction_df[['tourney_level', 'surface', 'player1_age', 'player2_age', 'player1_ht', 'player2_ht', 'player1_ioc', 'player2_ioc', 'player1_rank', 'player2_rank', 'player1_seed', 'player2_seed']].copy()
+
                 # Get the prediction
                 prediction_val = model.predict(prediction_df)[0]
                 probability = model.predict_proba(prediction_df)[0]
