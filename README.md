@@ -1,6 +1,6 @@
 # Tennis-Match-Winner-Predictor
 
-**For this project, our goal is to predict professioanl tennis match outcomes using machine learning.**
+**For this project, our goal is to predict professional tennis match outcomes using machine learning.**
 
 **Developers:**
 
